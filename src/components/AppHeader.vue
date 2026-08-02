@@ -20,7 +20,7 @@ const {
     <div>
       <h1 class="text-2xl font-bold text-amber-400">瑪奇 Mobile 任務助手</h1>
       <p class="text-xs text-slate-400 mt-1">
-        上次每日重置: {{ lastDate }} | 上次每週重置: {{ lastWeekKey }}
+        目前遊戲日: {{ lastDate }} | 目前週次: {{ lastWeekKey }}
       </p>
     </div>
     <div class="flex flex-wrap gap-2">

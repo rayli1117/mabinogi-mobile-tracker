@@ -46,7 +46,7 @@ const {
 
     <div class="flex items-center gap-2 ml-2 shrink-0">
       <div
-        v-if="task.maxCount && task.maxCount > 1"
+        v-if="task.maxCount"
         class="flex items-center bg-slate-900 rounded border border-slate-700/80 px-1 py-0.5"
       >
         <button

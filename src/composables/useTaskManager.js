@@ -54,7 +54,10 @@ let initialized = false
 function getCustomDateString(date = new Date()) {
   const d = new Date(date)
   if (d.getHours() < 6) d.setDate(d.getDate() - 1)
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function getCustomWeekKey(date = new Date()) {
@@ -85,6 +88,59 @@ function getCategoryInfo(catId) {
   return categories.find((c) => c.id === catId) || { name: '其他', icon: '📌' }
 }
 
+function getDefaultCharacters() {
+  return [{ id: 'char_1', name: '主要角色' }]
+}
+
+function getDefaultCharacterTasks() {
+  return {
+    char_1: {
+      dailyTasks: JSON.parse(JSON.stringify(presetDailyTasks)),
+      weeklyTasks: JSON.parse(JSON.stringify(presetWeeklyTasks)),
+    },
+  }
+}
+
+function normalizeCharacters(rawCharacters) {
+  if (!Array.isArray(rawCharacters) || rawCharacters.length === 0) return null
+  const normalized = []
+  for (const char of rawCharacters) {
+    if (!char || typeof char.id !== 'string' || !char.id.trim()) return null
+    if (typeof char.name !== 'string') return null
+    normalized.push({ id: char.id, name: char.name })
+  }
+  return normalized
+}
+
+function normalizeCharacterTasks(chars, rawTasks) {
+  const source =
+    rawTasks && typeof rawTasks === 'object' && !Array.isArray(rawTasks) ? rawTasks : {}
+  const next = {}
+  for (const char of chars) {
+    const entry = source[char.id]
+    next[char.id] = {
+      dailyTasks: Array.isArray(entry?.dailyTasks) ? entry.dailyTasks : [],
+      weeklyTasks: Array.isArray(entry?.weeklyTasks) ? entry.weeklyTasks : [],
+    }
+  }
+  return next
+}
+
+function resolveActiveCharId(chars, rawActiveId) {
+  if (typeof rawActiveId === 'string' && chars.some((c) => c.id === rawActiveId)) {
+    return rawActiveId
+  }
+  return chars[0].id
+}
+
+function isValidImportPayload(parsed) {
+  if (!normalizeCharacters(parsed?.characters)) return false
+  if (!parsed.characterTasks || typeof parsed.characterTasks !== 'object' || Array.isArray(parsed.characterTasks)) {
+    return false
+  }
+  return true
+}
+
 function saveData() {
   const data = {
     lastDate: getCustomDateString(),
@@ -93,9 +149,35 @@ function saveData() {
     characters: characters.value,
     characterTasks: characterTasks.value,
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  lastDate.value = data.lastDate
-  lastWeekKey.value = data.lastWeekKey
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    lastDate.value = data.lastDate
+    lastWeekKey.value = data.lastWeekKey
+    return true
+  } catch {
+    alert('⚠️ 儲存失敗，瀏覽器儲存空間可能已滿。請匯出備份後清理空間再試。')
+    return false
+  }
+}
+
+function ensureActiveCharacter() {
+  if (characters.value.length === 0) {
+    characters.value = getDefaultCharacters()
+    characterTasks.value = getDefaultCharacterTasks()
+  }
+  activeCharId.value = resolveActiveCharId(characters.value, activeCharId.value)
+  if (!characterTasks.value[activeCharId.value]) {
+    characterTasks.value[activeCharId.value] = { dailyTasks: [], weeklyTasks: [] }
+  }
+}
+
+function resetToDefaults(todayKey, currentWeekKey) {
+  characters.value = getDefaultCharacters()
+  activeCharId.value = characters.value[0].id
+  characterTasks.value = getDefaultCharacterTasks()
+  lastDate.value = todayKey
+  lastWeekKey.value = currentWeekKey
+  saveData()
 }
 
 function loadData() {
@@ -103,32 +185,57 @@ function loadData() {
   const todayKey = getCustomDateString()
   const currentWeekKey = getCustomWeekKey()
 
-  if (savedData) {
-    const parsed = JSON.parse(savedData)
-    characters.value = parsed.characters || [{ id: 'char_1', name: '主要角色' }]
-    activeCharId.value = parsed.activeCharId || characters.value[0].id
-    characterTasks.value = parsed.characterTasks || {}
-
-    const needResetDaily = parsed.lastDate !== todayKey
-    const needResetWeekly = parsed.lastWeekKey !== currentWeekKey
-
-    Object.keys(characterTasks.value).forEach((cId) => {
-      const charData = characterTasks.value[cId]
-      if (needResetDaily && charData.dailyTasks) {
-        charData.dailyTasks.forEach(resetTaskProgress)
-      }
-      if (needResetWeekly && charData.weeklyTasks) {
-        charData.weeklyTasks.forEach(resetTaskProgress)
-      }
-    })
-
+  if (!savedData) {
     lastDate.value = todayKey
     lastWeekKey.value = currentWeekKey
     saveData()
-  } else {
-    lastDate.value = todayKey
-    lastWeekKey.value = currentWeekKey
-    saveData()
+    return
+  }
+
+  let parsed
+  try {
+    parsed = JSON.parse(savedData)
+  } catch {
+    localStorage.removeItem(STORAGE_KEY)
+    resetToDefaults(todayKey, currentWeekKey)
+    return
+  }
+
+  const normalizedChars = normalizeCharacters(parsed.characters)
+  if (!normalizedChars) {
+    localStorage.removeItem(STORAGE_KEY)
+    resetToDefaults(todayKey, currentWeekKey)
+    return
+  }
+
+  characters.value = normalizedChars
+  activeCharId.value = resolveActiveCharId(normalizedChars, parsed.activeCharId)
+  characterTasks.value = normalizeCharacterTasks(normalizedChars, parsed.characterTasks)
+  ensureActiveCharacter()
+
+  const needResetDaily = parsed.lastDate !== todayKey
+  const needResetWeekly = parsed.lastWeekKey !== currentWeekKey
+
+  Object.keys(characterTasks.value).forEach((cId) => {
+    const charData = characterTasks.value[cId]
+    if (needResetDaily && charData.dailyTasks) {
+      charData.dailyTasks.forEach(resetTaskProgress)
+    }
+    if (needResetWeekly && charData.weeklyTasks) {
+      charData.weeklyTasks.forEach(resetTaskProgress)
+    }
+  })
+
+  lastDate.value = todayKey
+  lastWeekKey.value = currentWeekKey
+  saveData()
+}
+
+function checkPeriodReset() {
+  const todayKey = getCustomDateString()
+  const currentWeekKey = getCustomWeekKey()
+  if (todayKey !== lastDate.value || currentWeekKey !== lastWeekKey.value) {
+    loadData()
   }
 }
 
@@ -139,7 +246,6 @@ function updateDailyCountdown() {
   if (now >= target) target.setDate(target.getDate() + 1)
 
   const diffMs = target - now
-  if (diffMs <= 1000) loadData()
 
   const totalSeconds = Math.floor(diffMs / 1000)
   const hours = Math.floor(totalSeconds / 3600)
@@ -170,8 +276,17 @@ function updateWeeklyCountdown() {
 }
 
 function updateAllCountdowns() {
+  checkPeriodReset()
   updateDailyCountdown()
   updateWeeklyCountdown()
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    checkPeriodReset()
+    updateDailyCountdown()
+    updateWeeklyCountdown()
+  }
 }
 
 const currentCharacterName = computed(() => {
@@ -243,7 +358,9 @@ const weeklyProgress = computed(() => {
 })
 
 function switchCharacter(charId) {
+  if (!characters.value.some((c) => c.id === charId)) return
   activeCharId.value = charId
+  ensureActiveCharacter()
   saveData()
 }
 
@@ -329,8 +446,9 @@ function addTask() {
     category: newTaskCategory.value,
   }
 
-  if (hasCountLimit.value && maxCountInput.value > 1) {
-    newTask.maxCount = maxCountInput.value
+  if (hasCountLimit.value) {
+    const max = Math.min(99, Math.max(1, Number(maxCountInput.value) || 1))
+    newTask.maxCount = max
     newTask.currentCount = 0
   }
 
@@ -385,6 +503,8 @@ function deleteTask(type, id) {
 }
 
 function resetDaily() {
+  if (!confirm(`確定要重置【${currentCharacterName.value}】的每日任務進度嗎？`)) return
+  ensureActiveCharacter()
   const currentTasks = characterTasks.value[activeCharId.value]
   if (currentTasks && currentTasks.dailyTasks) {
     currentTasks.dailyTasks.forEach(resetTaskProgress)
@@ -393,6 +513,8 @@ function resetDaily() {
 }
 
 function resetWeekly() {
+  if (!confirm(`確定要重置【${currentCharacterName.value}】的每週任務進度嗎？`)) return
+  ensureActiveCharacter()
   const currentTasks = characterTasks.value[activeCharId.value]
   if (currentTasks && currentTasks.weeklyTasks) {
     currentTasks.weeklyTasks.forEach(resetTaskProgress)
@@ -431,15 +553,20 @@ function importData(event) {
   reader.onload = (e) => {
     try {
       const parsed = JSON.parse(e.target.result)
-      if (parsed.characters && parsed.characterTasks) {
-        characters.value = parsed.characters
-        activeCharId.value = parsed.activeCharId || characters.value[0].id
-        characterTasks.value = parsed.characterTasks
-        saveData()
-        alert('🎉 包含所有角色的任務備份匯入成功！')
-      } else {
+      if (!isValidImportPayload(parsed)) {
         alert('⚠️ 檔案格式不符合多角色任務清單規格！')
+        return
       }
+
+      if (!confirm('匯入會覆蓋目前所有角色與任務進度，確定要繼續嗎？')) return
+
+      const normalizedChars = normalizeCharacters(parsed.characters)
+      characters.value = normalizedChars
+      activeCharId.value = resolveActiveCharId(normalizedChars, parsed.activeCharId)
+      characterTasks.value = normalizeCharacterTasks(normalizedChars, parsed.characterTasks)
+      ensureActiveCharacter()
+      saveData()
+      alert('🎉 包含所有角色的任務備份匯入成功！')
     } catch {
       alert('❌ 解析 JSON 檔案失敗，請確認檔案格式是否正確。')
     }
@@ -456,6 +583,7 @@ function initTaskManager() {
     loadData()
     updateAllCountdowns()
     timer = setInterval(updateAllCountdowns, 1000)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
   })
 
   onUnmounted(() => {
@@ -463,6 +591,7 @@ function initTaskManager() {
       clearInterval(timer)
       timer = null
     }
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
     initialized = false
   })
 }
