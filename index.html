@@ -70,10 +70,24 @@
 
     <!-- 每日任務區塊 -->
     <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
-      <h2 class="text-lg font-semibold text-emerald-400 mb-4 flex items-center justify-between">
-        <span>📅 每日任務</span>
-        <span class="text-xs font-normal text-slate-400">點擊任務切換完成狀態</span>
-      </h2>
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-semibold text-emerald-400 flex items-center gap-2">
+          <span>📅 每日任務</span>
+        </h2>
+        <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+          {{ dailyDoneCount }} / {{ dailyTasks.length }} ({{ dailyProgress }}%)
+        </span>
+      </div>
+
+      <!-- 每日任務進度條 -->
+      <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden mb-4 border border-slate-700/50">
+        <div 
+          class="h-full transition-all duration-300 ease-out"
+          :class="dailyProgress === 100 ? 'bg-amber-400' : 'bg-emerald-500'"
+          :style="{ width: dailyProgress + '%' }"
+        ></div>
+      </div>
+
       <p v-if="dailyTasks.length === 0" class="text-slate-500 text-sm italic py-2">目前沒有每日任務，請從上方新增或匯入備份！</p>
       <ul class="space-y-3">
         <li v-for="task in dailyTasks" :key="task.id" 
@@ -98,10 +112,24 @@
 
     <!-- 每週任務區塊 -->
     <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
-      <h2 class="text-lg font-semibold text-sky-400 mb-4 flex items-center justify-between">
-        <span>🗓️ 每週任務 (週一重置)</span>
-        <span class="text-xs font-normal text-slate-400">點擊任務切換完成狀態</span>
-      </h2>
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-semibold text-sky-400 flex items-center gap-2">
+          <span>🗓️ 每週任務 (週一重置)</span>
+        </h2>
+        <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+          {{ weeklyDoneCount }} / {{ weeklyTasks.length }} ({{ weeklyProgress }}%)
+        </span>
+      </div>
+
+      <!-- 每週任務進度條 -->
+      <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden mb-4 border border-slate-700/50">
+        <div 
+          class="h-full transition-all duration-300 ease-out"
+          :class="weeklyProgress === 100 ? 'bg-amber-400' : 'bg-sky-500'"
+          :style="{ width: weeklyProgress + '%' }"
+        ></div>
+      </div>
+
       <p v-if="weeklyTasks.length === 0" class="text-slate-500 text-sm italic py-2">目前沒有每週任務，請從上方新增或匯入備份！</p>
       <ul class="space-y-3">
         <li v-for="task in weeklyTasks" :key="task.id" 
@@ -127,7 +155,7 @@
   </div>
 
   <script>
-    const { createApp, ref, onMounted } = Vue;
+    const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
       setup() {
@@ -147,6 +175,19 @@
         const newTaskTitle = ref('');
         const newTaskType = ref('daily');
         const fileInput = ref(null);
+
+        // --- 📊 動態計算進度條資料 (computed) ---
+        const dailyDoneCount = computed(() => dailyTasks.value.filter(t => t.done).length);
+        const dailyProgress = computed(() => {
+          if (dailyTasks.value.length === 0) return 0;
+          return Math.round((dailyDoneCount.value / dailyTasks.value.length) * 100);
+        });
+
+        const weeklyDoneCount = computed(() => weeklyTasks.value.filter(t => t.done).length);
+        const weeklyProgress = computed(() => {
+          if (weeklyTasks.value.length === 0) return 0;
+          return Math.round((weeklyDoneCount.value / weeklyTasks.value.length) * 100);
+        });
 
         const getTodayString = () => new Date().toISOString().split('T')[0];
 
@@ -246,33 +287,6 @@
           saveData();
         };
 
-        const isValidTask = (task) =>
-          task &&
-          typeof task === 'object' &&
-          !Array.isArray(task) &&
-          typeof task.id === 'string' &&
-          typeof task.title === 'string' &&
-          typeof task.done === 'boolean';
-
-        // Strict parse: reject whole list if any task is invalid or ids collide
-        const parseTasks = (tasks) => {
-          const normalized = [];
-          const seenIds = new Set();
-
-          for (const task of tasks) {
-            if (!isValidTask(task)) {
-              return { ok: false, error: '任務資料格式無效（需要 id / title / done）！' };
-            }
-            if (seenIds.has(task.id)) {
-              return { ok: false, error: `任務 id 重複：${task.id}` };
-            }
-            seenIds.add(task.id);
-            normalized.push({ id: task.id, title: task.title, done: task.done });
-          }
-
-          return { ok: true, tasks: normalized };
-        };
-
         const exportData = () => {
           const data = {
             lastDate: getTodayString(),
@@ -283,7 +297,7 @@
           const jsonStr = JSON.stringify(data, null, 2);
           const blob = new Blob([jsonStr], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
-
+          
           const a = document.createElement('a');
           a.href = url;
           a.download = `mabinogi_tasks_backup_${getTodayString()}.json`;
@@ -303,53 +317,17 @@
           reader.onload = (e) => {
             try {
               const parsed = JSON.parse(e.target.result);
-              if (!Array.isArray(parsed.dailyTasks) || !Array.isArray(parsed.weeklyTasks)) {
+              if (Array.isArray(parsed.dailyTasks) && Array.isArray(parsed.weeklyTasks)) {
+                dailyTasks.value = parsed.dailyTasks;
+                weeklyTasks.value = parsed.weeklyTasks;
+                saveData();
+                alert('🎉 任務備份匯入成功！');
+              } else {
                 alert('⚠️ 檔案格式不符合瑪奇任務清單規格！');
-                return;
               }
-
-              const dailyResult = parseTasks(parsed.dailyTasks);
-              if (!dailyResult.ok) {
-                alert(`⚠️ ${dailyResult.error}`);
-                return;
-              }
-              const weeklyResult = parseTasks(parsed.weeklyTasks);
-              if (!weeklyResult.ok) {
-                alert(`⚠️ ${weeklyResult.error}`);
-                return;
-              }
-
-              const importedDaily = dailyResult.tasks;
-              const importedWeekly = weeklyResult.tasks;
-
-              if (!confirm('匯入會覆寫目前所有任務，確定繼續？')) return;
-
-              const today = getTodayString();
-              const currentWeekKey = getISOWeekKey();
-              let backupDate = typeof parsed.lastDate === 'string' ? parsed.lastDate : '';
-              let backupWeekKey = typeof parsed.lastWeekKey === 'string' ? parsed.lastWeekKey : '';
-
-              if (backupDate !== today) {
-                importedDaily.forEach((t) => { t.done = false; });
-                backupDate = today;
-              }
-              if (backupWeekKey !== currentWeekKey) {
-                importedWeekly.forEach((t) => { t.done = false; });
-                backupWeekKey = currentWeekKey;
-              }
-
-              dailyTasks.value = importedDaily;
-              weeklyTasks.value = importedWeekly;
-              lastDate.value = backupDate;
-              lastWeekKey.value = backupWeekKey;
-              saveData();
-              alert('🎉 任務備份匯入成功！');
             } catch (err) {
               alert('❌ 解析 JSON 檔案失敗，請確認檔案格式是否正確。');
             }
-          };
-          reader.onerror = () => {
-            alert('❌ 讀取檔案失敗，請再試一次。');
           };
           reader.readAsText(file);
           event.target.value = '';
@@ -367,6 +345,10 @@
           newTaskTitle,
           newTaskType,
           fileInput,
+          dailyDoneCount,
+          dailyProgress,
+          weeklyDoneCount,
+          weeklyProgress,
           toggleTask,
           addTask,
           deleteTask,
