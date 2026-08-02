@@ -8,6 +8,12 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Vue 3 CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    /* 讓任務清單位置改變時有順暢的滑動動畫 */
+    .task-list-move {
+      transition: transform 0.4s ease;
+    }
+  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
   <div id="app" class="max-w-2xl mx-auto space-y-6">
@@ -41,9 +47,34 @@
       </div>
     </header>
 
+    <!-- ⏳ 倒數計時區塊 (每日 + 每週) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- 每日倒數 -->
+      <section class="bg-slate-800/80 border border-amber-500/30 p-3 rounded-xl shadow-md flex items-center justify-between">
+        <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
+          <span class="text-amber-400 text-base">⏳</span>
+          <span class="font-medium">距離每日重置 (06:00)：</span>
+        </div>
+        <div class="font-mono font-bold text-amber-400 text-xs sm:text-sm tracking-wider bg-slate-900 px-2.5 py-1 rounded border border-amber-500/20">
+          {{ dailyCountdownText }}
+        </div>
+      </section>
+
+      <!-- 每週倒數 -->
+      <section class="bg-slate-800/80 border border-sky-500/30 p-3 rounded-xl shadow-md flex items-center justify-between">
+        <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
+          <span class="text-sky-400 text-base">🗓️</span>
+          <span class="font-medium">距離每週重置 (週一 06:00)：</span>
+        </div>
+        <div class="font-mono font-bold text-sky-400 text-xs sm:text-sm tracking-wider bg-slate-900 px-2.5 py-1 rounded border border-sky-500/20">
+          {{ weeklyCountdownText }}
+        </div>
+      </section>
+    </div>
+
     <!-- 新增任務輸入區塊 -->
-    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
-      <h3 class="text-sm font-semibold text-slate-300 mb-3">➕ 新增任務</h3>
+    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg space-y-3">
+      <h3 class="text-sm font-semibold text-slate-300">➕ 新增任務</h3>
       <div class="flex flex-col sm:flex-row gap-2">
         <input 
           v-model="newTaskTitle" 
@@ -53,6 +84,14 @@
           class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 transition"
         />
         <select 
+          v-model="newTaskCategory" 
+          class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
+        >
+          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+            {{ cat.icon }} {{ cat.name }}
+          </option>
+        </select>
+        <select 
           v-model="newTaskType" 
           class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
         >
@@ -61,7 +100,7 @@
         </select>
         <button 
           @click="addTask" 
-          class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg text-sm transition"
+          class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg text-sm transition shrink-0"
         >
           新增
         </button>
@@ -80,7 +119,7 @@
       </div>
 
       <!-- 每日任務進度條 -->
-      <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden mb-4 border border-slate-700/50">
+      <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden mb-3 border border-slate-700/50">
         <div 
           class="h-full transition-all duration-300 ease-out"
           :class="dailyProgress === 100 ? 'bg-amber-400' : 'bg-emerald-500'"
@@ -88,33 +127,59 @@
         ></div>
       </div>
 
-      <p v-if="dailyTasks.length === 0" class="text-slate-500 text-sm italic py-2">目前沒有每日任務，請從上方新增或匯入備份！</p>
-      <ul class="space-y-3">
-        <li v-for="task in dailyTasks" :key="task.id" 
-            class="flex items-center justify-between p-3 rounded-lg border transition select-none group"
-            :class="task.done ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
+      <!-- 🏷️ 每日任務分類過濾器 -->
+      <div class="flex flex-wrap gap-1.5 mb-4">
+        <button 
+          @click="dailyFilter = 'all'"
+          class="px-2.5 py-1 rounded-full text-xs font-medium transition"
+          :class="dailyFilter === 'all' ? 'bg-emerald-500 text-slate-950 font-semibold' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700'"
+        >
+          全部
+        </button>
+        <button 
+          v-for="cat in categories" :key="cat.id"
+          @click="dailyFilter = cat.id"
+          class="px-2.5 py-1 rounded-full text-xs font-medium transition flex items-center gap-1"
+          :class="dailyFilter === cat.id ? 'bg-emerald-500 text-slate-950 font-semibold' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700'"
+        >
+          <span>{{ cat.icon }}</span>
+          <span>{{ cat.name }}</span>
+        </button>
+      </div>
+
+      <p v-if="filteredDailyTasks.length === 0" class="text-slate-500 text-sm italic py-2">該分類下目前沒有每日任務！</p>
+      
+      <!-- 動畫包裹容器 (transition-group) -->
+      <transition-group name="task-list" tag="ul" class="space-y-3 relative">
+        <li v-for="task in filteredDailyTasks" :key="task.id" 
+            class="flex items-center justify-between p-3 rounded-lg border transition-all duration-300 select-none group"
+            :class="task.done ? 'bg-slate-900/50 border-slate-800/80 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
           
           <div @click="toggleTask(task)" class="flex-1 flex items-center gap-3 cursor-pointer">
-            <span class="text-lg">{{ task.done ? '✅' : '⬜' }}</span>
+            <span class="text-lg transition-transform active:scale-125">{{ task.done ? '✅' : '⬜' }}</span>
             <span :class="{ 'line-through': task.done }">{{ task.title }}</span>
+            <!-- 分類標籤 Badge -->
+            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal ml-auto sm:ml-0">
+              {{ getCategoryInfo(task.category).icon }} {{ getCategoryInfo(task.category).name }}
+            </span>
           </div>
 
           <button 
             @click.stop="deleteTask('daily', task.id)" 
-            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100 ml-2"
             title="刪除任務"
           >
             🗑️
           </button>
         </li>
-      </ul>
+      </transition-group>
     </section>
 
     <!-- 每週任務區塊 -->
     <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
       <div class="flex items-center justify-between mb-2">
         <h2 class="text-lg font-semibold text-sky-400 flex items-center gap-2">
-          <span>🗓️ 每週任務 (週一重置)</span>
+          <span>🗓️ 每週任務 (週一 06:00 重置)</span>
         </h2>
         <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
           {{ weeklyDoneCount }} / {{ weeklyTasks.length }} ({{ weeklyProgress }}%)
@@ -122,7 +187,7 @@
       </div>
 
       <!-- 每週任務進度條 -->
-      <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden mb-4 border border-slate-700/50">
+      <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden mb-3 border border-slate-700/50">
         <div 
           class="h-full transition-all duration-300 ease-out"
           :class="weeklyProgress === 100 ? 'bg-amber-400' : 'bg-sky-500'"
@@ -130,53 +195,114 @@
         ></div>
       </div>
 
-      <p v-if="weeklyTasks.length === 0" class="text-slate-500 text-sm italic py-2">目前沒有每週任務，請從上方新增或匯入備份！</p>
-      <ul class="space-y-3">
-        <li v-for="task in weeklyTasks" :key="task.id" 
-            class="flex items-center justify-between p-3 rounded-lg border transition select-none group"
-            :class="task.done ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
+      <!-- 🏷️ 每週任務分類過濾器 -->
+      <div class="flex flex-wrap gap-1.5 mb-4">
+        <button 
+          @click="weeklyFilter = 'all'"
+          class="px-2.5 py-1 rounded-full text-xs font-medium transition"
+          :class="weeklyFilter === 'all' ? 'bg-sky-500 text-slate-950 font-semibold' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700'"
+        >
+          全部
+        </button>
+        <button 
+          v-for="cat in categories" :key="cat.id"
+          @click="weeklyFilter = cat.id"
+          class="px-2.5 py-1 rounded-full text-xs font-medium transition flex items-center gap-1"
+          :class="weeklyFilter === cat.id ? 'bg-sky-500 text-slate-950 font-semibold' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700'"
+        >
+          <span>{{ cat.icon }}</span>
+          <span>{{ cat.name }}</span>
+        </button>
+      </div>
+
+      <p v-if="filteredWeeklyTasks.length === 0" class="text-slate-500 text-sm italic py-2">該分類下目前沒有每週任務！</p>
+
+      <!-- 動畫包裹容器 (transition-group) -->
+      <transition-group name="task-list" tag="ul" class="space-y-3 relative">
+        <li v-for="task in filteredWeeklyTasks" :key="task.id" 
+            class="flex items-center justify-between p-3 rounded-lg border transition-all duration-300 select-none group"
+            :class="task.done ? 'bg-slate-900/50 border-slate-800/80 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
           
           <div @click="toggleTask(task)" class="flex-1 flex items-center gap-3 cursor-pointer">
-            <span class="text-lg">{{ task.done ? '✅' : '⬜' }}</span>
+            <span class="text-lg transition-transform active:scale-125">{{ task.done ? '✅' : '⬜' }}</span>
             <span :class="{ 'line-through': task.done }">{{ task.title }}</span>
+            <!-- 分類標籤 Badge -->
+            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal ml-auto sm:ml-0">
+              {{ getCategoryInfo(task.category).icon }} {{ getCategoryInfo(task.category).name }}
+            </span>
           </div>
 
           <button 
             @click.stop="deleteTask('weekly', task.id)" 
-            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100 ml-2"
             title="刪除任務"
           >
             🗑️
           </button>
         </li>
-      </ul>
+      </transition-group>
     </section>
 
   </div>
 
   <script>
-    const { createApp, ref, computed, onMounted } = Vue;
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
     createApp({
       setup() {
+        const categories = [
+          { id: 'dungeon', name: '副本討伐', icon: '⚔️' },
+          { id: 'guild', name: '公會活動', icon: '🏰' },
+          { id: 'life', name: '生活/採集', icon: '🌿' },
+          { id: 'shop', name: '商店買賣', icon: '🛒' },
+          { id: 'other', name: '其他', icon: '📌' }
+        ];
+
         const dailyTasks = ref([
-          { id: 'd1', title: '每日公會簽到', done: false },
-          { id: 'd2', title: '每日地下城討伐 (3/3)', done: false },
-          { id: 'd3', title: '購買每日限購商店物資', done: false }
+          { id: 'd1', title: '每日公會簽到', done: false, category: 'guild' },
+          { id: 'd2', title: '每日地下城討伐 (3/3)', done: false, category: 'dungeon' },
+          { id: 'd3', title: '購買每日限購商店物資', done: false, category: 'shop' }
         ]);
 
         const weeklyTasks = ref([
-          { id: 'w1', title: '每週團隊副本', done: false },
-          { id: 'w2', title: '每週公會任務達成', done: false }
+          { id: 'w1', title: '每週團隊副本', done: false, category: 'dungeon' },
+          { id: 'w2', title: '每週公會任務達成', done: false, category: 'guild' }
         ]);
 
         const lastDate = ref('');
         const lastWeekKey = ref('');
         const newTaskTitle = ref('');
         const newTaskType = ref('daily');
-        const fileInput = ref(null);
+        const newTaskCategory = ref('dungeon');
+        
+        const dailyFilter = ref('all');
+        const weeklyFilter = ref('all');
 
-        // --- 📊 動態計算進度條資料 (computed) ---
+        const fileInput = ref(null);
+        const dailyCountdownText = ref('00:00:00');
+        const weeklyCountdownText = ref('0天 00:00:00');
+        let timer = null;
+
+        const getCategoryInfo = (catId) => {
+          return categories.find(c => c.id === catId) || { name: '其他', icon: '📌' };
+        };
+
+        const filteredDailyTasks = computed(() => {
+          let list = dailyTasks.value;
+          if (dailyFilter.value !== 'all') {
+            list = list.filter(t => t.category === dailyFilter.value);
+          }
+          return [...list].sort((a, b) => Number(a.done) - Number(b.done));
+        });
+
+        const filteredWeeklyTasks = computed(() => {
+          let list = weeklyTasks.value;
+          if (weeklyFilter.value !== 'all') {
+            list = list.filter(t => t.category === weeklyFilter.value);
+          }
+          return [...list].sort((a, b) => Number(a.done) - Number(b.done));
+        });
+
         const dailyDoneCount = computed(() => dailyTasks.value.filter(t => t.done).length);
         const dailyProgress = computed(() => {
           if (dailyTasks.value.length === 0) return 0;
@@ -189,31 +315,104 @@
           return Math.round((weeklyDoneCount.value / weeklyTasks.value.length) * 100);
         });
 
-        const getTodayString = () => new Date().toISOString().split('T')[0];
+        // 取得考量 06:00 點重置的日期字串
+        const getCustomDateString = (date = new Date()) => {
+          const d = new Date(date);
+          if (d.getHours() < 6) {
+            d.setDate(d.getDate() - 1);
+          }
+          return d.toISOString().split('T')[0];
+        };
 
-        const getISOWeekKey = (date = new Date()) => {
-          const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-          const dayNum = d.getUTCDay() || 7;
-          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-          const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-          return `${d.getUTCFullYear()}-W${weekNo < 10 ? '0' + weekNo : weekNo}`;
+        // 取得考量 週一 06:00 點重置的週次 Key
+        const getCustomWeekKey = (date = new Date()) => {
+          const d = new Date(date);
+          if (d.getHours() < 6) {
+            d.setDate(d.getDate() - 1);
+          }
+          const utcDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+          const dayNum = utcDate.getUTCDay() || 7;
+          utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+          const weekNo = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+          return `${utcDate.getUTCFullYear()}-W${weekNo < 10 ? '0' + weekNo : weekNo}`;
+        };
+
+        // ⏳ 計算距離每日重置 (凌晨 06:00) 的倒數時間
+        const updateDailyCountdown = () => {
+          const now = new Date();
+          const target = new Date();
+
+          target.setHours(6, 0, 0, 0);
+
+          if (now >= target) {
+            target.setDate(target.getDate() + 1);
+          }
+
+          const diffMs = target - now;
+
+          if (diffMs <= 1000) {
+            loadData();
+          }
+
+          const totalSeconds = Math.floor(diffMs / 1000);
+          const hours = Math.floor(totalSeconds / 3600);
+          const minutes = Math.floor((totalSeconds % 3600) / 60);
+          const seconds = totalSeconds % 60;
+
+          const pad = (num) => String(num).padStart(2, '0');
+          dailyCountdownText.value = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        };
+
+        // ⏳ 計算距離每週重置 (週一 06:00 AM) 的倒數時間
+        const updateWeeklyCountdown = () => {
+          const now = new Date();
+          const target = new Date();
+
+          target.setHours(6, 0, 0, 0);
+
+          // 計算距離下個星期一還有幾天 (0是週日，1是週一)
+          const currentDay = now.getDay();
+          let daysUntilMonday = (1 + 7 - currentDay) % 7;
+
+          // 若今天就是週一，但已經過了 06:00 AM，目標推算到下週一
+          if (daysUntilMonday === 0 && now >= target) {
+            daysUntilMonday = 7;
+          }
+
+          target.setDate(now.getDate() + daysUntilMonday);
+
+          const diffMs = target - now;
+
+          const totalSeconds = Math.floor(diffMs / 1000);
+          const days = Math.floor(totalSeconds / 86400);
+          const hours = Math.floor((totalSeconds % 86400) / 3600);
+          const minutes = Math.floor((totalSeconds % 3600) / 60);
+          const seconds = totalSeconds % 60;
+
+          const pad = (num) => String(num).padStart(2, '0');
+          weeklyCountdownText.value = `${days}天 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        };
+
+        const updateAllCountdowns = () => {
+          updateDailyCountdown();
+          updateWeeklyCountdown();
         };
 
         const loadData = () => {
           const savedData = localStorage.getItem('mabinogi_tasks');
-          const today = getTodayString();
-          const currentWeekKey = getISOWeekKey();
+          const todayKey = getCustomDateString();
+          const currentWeekKey = getCustomWeekKey();
 
           if (savedData) {
             const parsed = JSON.parse(savedData);
 
-            dailyTasks.value = parsed.dailyTasks || [];
-            weeklyTasks.value = parsed.weeklyTasks || [];
+            dailyTasks.value = (parsed.dailyTasks || []).map(t => ({ category: 'other', ...t }));
+            weeklyTasks.value = (parsed.weeklyTasks || []).map(t => ({ category: 'other', ...t }));
             
-            if (parsed.lastDate !== today) {
+            if (parsed.lastDate !== todayKey) {
               dailyTasks.value.forEach(t => t.done = false);
-              parsed.lastDate = today;
+              parsed.lastDate = todayKey;
             }
 
             if (parsed.lastWeekKey !== currentWeekKey) {
@@ -226,7 +425,7 @@
 
             saveData();
           } else {
-            lastDate.value = today;
+            lastDate.value = todayKey;
             lastWeekKey.value = currentWeekKey;
             saveData();
           }
@@ -234,8 +433,8 @@
 
         const saveData = () => {
           const data = {
-            lastDate: getTodayString(),
-            lastWeekKey: getISOWeekKey(),
+            lastDate: getCustomDateString(),
+            lastWeekKey: getCustomWeekKey(),
             dailyTasks: dailyTasks.value,
             weeklyTasks: weeklyTasks.value
           };
@@ -255,7 +454,8 @@
           const newTask = {
             id: Date.now().toString(),
             title: newTaskTitle.value.trim(),
-            done: false
+            done: false,
+            category: newTaskCategory.value
           };
 
           if (newTaskType.value === 'daily') {
@@ -289,8 +489,8 @@
 
         const exportData = () => {
           const data = {
-            lastDate: getTodayString(),
-            lastWeekKey: getISOWeekKey(),
+            lastDate: getCustomDateString(),
+            lastWeekKey: getCustomWeekKey(),
             dailyTasks: dailyTasks.value,
             weeklyTasks: weeklyTasks.value
           };
@@ -300,7 +500,7 @@
           
           const a = document.createElement('a');
           a.href = url;
-          a.download = `mabinogi_tasks_backup_${getTodayString()}.json`;
+          a.download = `mabinogi_tasks_backup_${getCustomDateString()}.json`;
           a.click();
           URL.revokeObjectURL(url);
         };
@@ -318,8 +518,8 @@
             try {
               const parsed = JSON.parse(e.target.result);
               if (Array.isArray(parsed.dailyTasks) && Array.isArray(parsed.weeklyTasks)) {
-                dailyTasks.value = parsed.dailyTasks;
-                weeklyTasks.value = parsed.weeklyTasks;
+                dailyTasks.value = parsed.dailyTasks.map(t => ({ category: 'other', ...t }));
+                weeklyTasks.value = parsed.weeklyTasks.map(t => ({ category: 'other', ...t }));
                 saveData();
                 alert('🎉 任務備份匯入成功！');
               } else {
@@ -335,20 +535,35 @@
 
         onMounted(() => {
           loadData();
+          updateAllCountdowns();
+          timer = setInterval(updateAllCountdowns, 1000);
+        });
+
+        onUnmounted(() => {
+          if (timer) clearInterval(timer);
         });
 
         return {
+          categories,
           dailyTasks,
           weeklyTasks,
+          filteredDailyTasks,
+          filteredWeeklyTasks,
+          dailyFilter,
+          weeklyFilter,
           lastDate,
           lastWeekKey,
           newTaskTitle,
           newTaskType,
+          newTaskCategory,
           fileInput,
+          dailyCountdownText,
+          weeklyCountdownText,
           dailyDoneCount,
           dailyProgress,
           weeklyDoneCount,
           weeklyProgress,
+          getCategoryInfo,
           toggleTask,
           addTask,
           deleteTask,
