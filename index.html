@@ -249,14 +249,29 @@
         const isValidTask = (task) =>
           task &&
           typeof task === 'object' &&
+          !Array.isArray(task) &&
           typeof task.id === 'string' &&
           typeof task.title === 'string' &&
           typeof task.done === 'boolean';
 
-        const normalizeTasks = (tasks) =>
-          tasks
-            .filter(isValidTask)
-            .map((t) => ({ id: t.id, title: t.title, done: t.done }));
+        // Strict parse: reject whole list if any task is invalid or ids collide
+        const parseTasks = (tasks) => {
+          const normalized = [];
+          const seenIds = new Set();
+
+          for (const task of tasks) {
+            if (!isValidTask(task)) {
+              return { ok: false, error: '任務資料格式無效（需要 id / title / done）！' };
+            }
+            if (seenIds.has(task.id)) {
+              return { ok: false, error: `任務 id 重複：${task.id}` };
+            }
+            seenIds.add(task.id);
+            normalized.push({ id: task.id, title: task.title, done: task.done });
+          }
+
+          return { ok: true, tasks: normalized };
+        };
 
         const exportData = () => {
           const data = {
@@ -293,16 +308,19 @@
                 return;
               }
 
-              const importedDaily = normalizeTasks(parsed.dailyTasks);
-              const importedWeekly = normalizeTasks(parsed.weeklyTasks);
-
-              if (
-                (parsed.dailyTasks.length > 0 && importedDaily.length === 0) ||
-                (parsed.weeklyTasks.length > 0 && importedWeekly.length === 0)
-              ) {
-                alert('⚠️ 任務資料格式無效（需要 id / title / done）！');
+              const dailyResult = parseTasks(parsed.dailyTasks);
+              if (!dailyResult.ok) {
+                alert(`⚠️ ${dailyResult.error}`);
                 return;
               }
+              const weeklyResult = parseTasks(parsed.weeklyTasks);
+              if (!weeklyResult.ok) {
+                alert(`⚠️ ${weeklyResult.error}`);
+                return;
+              }
+
+              const importedDaily = dailyResult.tasks;
+              const importedWeekly = weeklyResult.tasks;
 
               if (!confirm('匯入會覆寫目前所有任務，確定繼續？')) return;
 
