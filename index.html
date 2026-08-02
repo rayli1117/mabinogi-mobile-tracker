@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>瑪奇 Mobile - 每日/每週任務清單</title>
+  <title>瑪奇 Mobile - 多角色任務助手</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Vue 3 CDN -->
@@ -12,6 +12,13 @@
     /* 讓任務清單位置改變時有順暢的滑動動畫 */
     .task-list-move {
       transition: transform 0.4s ease;
+    }
+    /* Modal 漸變效果 */
+    .fade-enter-active, .fade-leave-active {
+      transition: opacity 0.25s ease;
+    }
+    .fade-enter-from, .fade-leave-to {
+      opacity: 0;
     }
   </style>
 </head>
@@ -27,6 +34,16 @@
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <!-- 📊 角色進度總覽按鈕 -->
+        <button @click="showDashboard = true" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded shadow transition flex items-center gap-1">
+          📊 進度總覽
+        </button>
+
+        <!-- 載入範本 -->
+        <button @click="loadPresetTemplates" class="px-2.5 py-1.5 bg-indigo-600/40 hover:bg-indigo-600/60 text-indigo-200 text-xs rounded border border-indigo-500/50 transition">
+          ✨ 載入範本
+        </button>
+
         <!-- 備份與還原 -->
         <button @click="exportData" class="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 text-xs rounded border border-amber-500/50 transition">
           📤 匯出 JSON
@@ -34,7 +51,6 @@
         <button @click="triggerFileInput" class="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 text-xs rounded border border-amber-500/50 transition">
           📥 匯入 JSON
         </button>
-        <!-- 隱藏的檔案上傳輸入框 -->
         <input type="file" ref="fileInput" @change="importData" accept=".json" class="hidden" />
 
         <!-- 手動重置 -->
@@ -46,6 +62,37 @@
         </button>
       </div>
     </header>
+
+    <!-- 👤 多角色分身切換列 -->
+    <section class="bg-slate-800/90 p-3 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 shadow-md">
+      <div class="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none flex-1">
+        <span class="text-xs font-semibold text-slate-400 shrink-0">🎭 角色:</span>
+        <button 
+          v-for="char in characters" 
+          :key="char.id"
+          @click="switchCharacter(char.id)"
+          class="px-3 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shrink-0"
+          :class="activeCharId === char.id ? 'bg-amber-500 text-slate-950 font-bold shadow' : 'bg-slate-900 text-slate-300 hover:bg-slate-700 border border-slate-700'"
+        >
+          <span>👤</span>
+          <span>{{ char.name }}</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <button @click="addNewCharacter" class="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 text-xs rounded border border-emerald-500/50 transition">
+          ➕ 新增分身
+        </button>
+        <button 
+          v-if="characters.length > 1" 
+          @click="deleteCurrentCharacter" 
+          class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 text-xs rounded border border-rose-500/40 transition"
+          title="刪除當前角色"
+        >
+          🗑️ 刪除此角色
+        </button>
+      </div>
+    </section>
 
     <!-- ⏳ 倒數計時區塊 (每日 + 每週) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -74,36 +121,65 @@
 
     <!-- 新增任務輸入區塊 -->
     <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg space-y-3">
-      <h3 class="text-sm font-semibold text-slate-300">➕ 新增任務</h3>
-      <div class="flex flex-col sm:flex-row gap-2">
-        <input 
-          v-model="newTaskTitle" 
-          @keyup.enter="addTask"
-          type="text" 
-          placeholder="輸入任務名稱 (例: 每週團隊副本)..." 
-          class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 transition"
-        />
-        <select 
-          v-model="newTaskCategory" 
-          class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
-        >
-          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-            {{ cat.icon }} {{ cat.name }}
-          </option>
-        </select>
-        <select 
-          v-model="newTaskType" 
-          class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
-        >
-          <option value="daily">📅 每日任務</option>
-          <option value="weekly">🗓️ 每週任務</option>
-        </select>
-        <button 
-          @click="addTask" 
-          class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg text-sm transition shrink-0"
-        >
-          新增
-        </button>
+      <h3 class="text-sm font-semibold text-slate-300">➕ 為【{{ currentCharacterName }}】新增任務</h3>
+      <div class="flex flex-col gap-2">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input 
+            v-model="newTaskTitle" 
+            @keyup.enter="addTask"
+            type="text" 
+            placeholder="輸入任務名稱 (例: 每日地下城討伐)..." 
+            class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 transition"
+          />
+          <select 
+            v-model="newTaskCategory" 
+            class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
+          >
+            <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+              {{ cat.icon }} {{ cat.name }}
+            </option>
+          </select>
+          <select 
+            v-model="newTaskType" 
+            class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
+          >
+            <option value="daily">📅 每日任務</option>
+            <option value="weekly">🗓️ 每週任務</option>
+          </select>
+        </div>
+
+        <!-- 次數與釘選設定列 -->
+        <div class="flex flex-wrap items-center justify-between bg-slate-900/60 p-2 rounded-lg border border-slate-700/60 text-xs gap-2">
+          <div class="flex items-center gap-4">
+            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300 select-none">
+              <input type="checkbox" v-model="hasCountLimit" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0">
+              <span>設定目標次數</span>
+            </label>
+            
+            <div v-if="hasCountLimit" class="flex items-center gap-1.5">
+              <span class="text-slate-400">次數:</span>
+              <input 
+                v-model.number="maxCountInput" 
+                type="number" 
+                min="1" 
+                max="99" 
+                class="w-14 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-center text-amber-400 font-mono text-xs focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <label class="flex items-center gap-1.5 cursor-pointer text-amber-300 select-none">
+              <input type="checkbox" v-model="newTaskPinned" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0">
+              <span>📌 置頂釘選</span>
+            </label>
+          </div>
+
+          <button 
+            @click="addTask" 
+            class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-1.5 rounded-lg text-xs transition ml-auto"
+          >
+            新增
+          </button>
+        </div>
       </div>
     </section>
 
@@ -114,7 +190,7 @@
           <span>📅 每日任務</span>
         </h2>
         <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
-          {{ dailyDoneCount }} / {{ dailyTasks.length }} ({{ dailyProgress }}%)
+          {{ dailyDoneCount }} / {{ currentDailyTasks.length }} ({{ dailyProgress }}%)
         </span>
       </div>
 
@@ -149,28 +225,56 @@
 
       <p v-if="filteredDailyTasks.length === 0" class="text-slate-500 text-sm italic py-2">該分類下目前沒有每日任務！</p>
       
-      <!-- 動畫包裹容器 (transition-group) -->
+      <!-- 動畫包裹容器 -->
       <transition-group name="task-list" tag="ul" class="space-y-3 relative">
         <li v-for="task in filteredDailyTasks" :key="task.id" 
             class="flex items-center justify-between p-3 rounded-lg border transition-all duration-300 select-none group"
-            :class="task.done ? 'bg-slate-900/50 border-slate-800/80 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
+            :class="[
+              task.done ? 'bg-slate-900/50 border-slate-800/80 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500',
+              task.pinned && !task.done ? 'ring-1 ring-amber-400/60 border-amber-500/50 bg-amber-950/20' : ''
+            ]">
           
-          <div @click="toggleTask(task)" class="flex-1 flex items-center gap-3 cursor-pointer">
-            <span class="text-lg transition-transform active:scale-125">{{ task.done ? '✅' : '⬜' }}</span>
-            <span :class="{ 'line-through': task.done }">{{ task.title }}</span>
-            <!-- 分類標籤 Badge -->
-            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal ml-auto sm:ml-0">
+          <div class="flex-1 flex items-center gap-3 cursor-pointer overflow-hidden" @click="toggleTask(task)">
+            <span class="text-lg transition-transform active:scale-125 shrink-0">{{ task.done ? '✅' : '⬜' }}</span>
+            <span v-if="task.pinned" class="text-xs shrink-0" title="重點釘選">📌</span>
+            <span class="truncate" :class="{ 'line-through': task.done }">{{ task.title }}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal shrink-0 hidden sm:inline-block">
               {{ getCategoryInfo(task.category).icon }} {{ getCategoryInfo(task.category).name }}
             </span>
           </div>
 
-          <button 
-            @click.stop="deleteTask('daily', task.id)" 
-            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100 ml-2"
-            title="刪除任務"
-          >
-            🗑️
-          </button>
+          <div class="flex items-center gap-2 ml-2 shrink-0">
+            <div v-if="task.maxCount && task.maxCount > 1" class="flex items-center bg-slate-900 rounded border border-slate-700/80 px-1 py-0.5">
+              <button 
+                @click.stop="decrementCount(task)"
+                class="w-5 h-5 flex items-center justify-center text-xs font-bold text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded transition"
+              >-</button>
+              <span class="text-xs font-mono px-1.5 font-semibold" :class="task.done ? 'text-slate-500' : 'text-amber-400'">
+                {{ task.currentCount || 0 }}/{{ task.maxCount }}
+              </span>
+              <button 
+                @click.stop="incrementCount(task)"
+                class="w-5 h-5 flex items-center justify-center text-xs font-bold text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded transition"
+              >+</button>
+            </div>
+
+            <button 
+              @click.stop="togglePin(task)" 
+              class="p-1 text-xs rounded transition"
+              :class="task.pinned ? 'text-amber-400 font-bold' : 'text-slate-500 hover:text-slate-300 opacity-60 sm:opacity-0 sm:group-hover:opacity-100'"
+              :title="task.pinned ? '取消釘選' : '釘選置頂'"
+            >
+              {{ task.pinned ? '📌' : '📍' }}
+            </button>
+
+            <button 
+              @click.stop="deleteTask('daily', task.id)" 
+              class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+              title="刪除任務"
+            >
+              🗑️
+            </button>
+          </div>
         </li>
       </transition-group>
     </section>
@@ -182,7 +286,7 @@
           <span>🗓️ 每週任務 (週一 06:00 重置)</span>
         </h2>
         <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
-          {{ weeklyDoneCount }} / {{ weeklyTasks.length }} ({{ weeklyProgress }}%)
+          {{ weeklyDoneCount }} / {{ currentWeeklyTasks.length }} ({{ weeklyProgress }}%)
         </span>
       </div>
 
@@ -217,31 +321,132 @@
 
       <p v-if="filteredWeeklyTasks.length === 0" class="text-slate-500 text-sm italic py-2">該分類下目前沒有每週任務！</p>
 
-      <!-- 動畫包裹容器 (transition-group) -->
+      <!-- 動畫包裹容器 -->
       <transition-group name="task-list" tag="ul" class="space-y-3 relative">
         <li v-for="task in filteredWeeklyTasks" :key="task.id" 
             class="flex items-center justify-between p-3 rounded-lg border transition-all duration-300 select-none group"
-            :class="task.done ? 'bg-slate-900/50 border-slate-800/80 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
+            :class="[
+              task.done ? 'bg-slate-900/50 border-slate-800/80 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500',
+              task.pinned && !task.done ? 'ring-1 ring-sky-400/60 border-sky-500/50 bg-sky-950/20' : ''
+            ]">
           
-          <div @click="toggleTask(task)" class="flex-1 flex items-center gap-3 cursor-pointer">
-            <span class="text-lg transition-transform active:scale-125">{{ task.done ? '✅' : '⬜' }}</span>
-            <span :class="{ 'line-through': task.done }">{{ task.title }}</span>
-            <!-- 分類標籤 Badge -->
-            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal ml-auto sm:ml-0">
+          <div class="flex-1 flex items-center gap-3 cursor-pointer overflow-hidden" @click="toggleTask(task)">
+            <span class="text-lg transition-transform active:scale-125 shrink-0">{{ task.done ? '✅' : '⬜' }}</span>
+            <span v-if="task.pinned" class="text-xs shrink-0" title="重點釘選">📌</span>
+            <span class="truncate" :class="{ 'line-through': task.done }">{{ task.title }}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal shrink-0 hidden sm:inline-block">
               {{ getCategoryInfo(task.category).icon }} {{ getCategoryInfo(task.category).name }}
             </span>
           </div>
 
-          <button 
-            @click.stop="deleteTask('weekly', task.id)" 
-            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100 ml-2"
-            title="刪除任務"
-          >
-            🗑️
-          </button>
+          <div class="flex items-center gap-2 ml-2 shrink-0">
+            <div v-if="task.maxCount && task.maxCount > 1" class="flex items-center bg-slate-900 rounded border border-slate-700/80 px-1 py-0.5">
+              <button 
+                @click.stop="decrementCount(task)"
+                class="w-5 h-5 flex items-center justify-center text-xs font-bold text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded transition"
+              >-</button>
+              <span class="text-xs font-mono px-1.5 font-semibold" :class="task.done ? 'text-slate-500' : 'text-sky-400'">
+                {{ task.currentCount || 0 }}/{{ task.maxCount }}
+              </span>
+              <button 
+                @click.stop="incrementCount(task)"
+                class="w-5 h-5 flex items-center justify-center text-xs font-bold text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded transition"
+              >+</button>
+            </div>
+
+            <button 
+              @click.stop="togglePin(task)" 
+              class="p-1 text-xs rounded transition"
+              :class="task.pinned ? 'text-sky-400 font-bold' : 'text-slate-500 hover:text-slate-300 opacity-60 sm:opacity-0 sm:group-hover:opacity-100'"
+              :title="task.pinned ? '取消釘選' : '釘選置頂'"
+            >
+              {{ task.pinned ? '📌' : '📍' }}
+            </button>
+
+            <button 
+              @click.stop="deleteTask('weekly', task.id)" 
+              class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+              title="刪除任務"
+            >
+              🗑️
+            </button>
+          </div>
         </li>
       </transition-group>
     </section>
+
+    <!-- 📊 角色進度總覽 Modal 彈窗 -->
+    <transition name="fade">
+      <div v-if="showDashboard" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          
+          <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+            <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+              <span>📊</span>
+              <span>角色進度總覽面板</span>
+            </h3>
+            <button @click="showDashboard = false" class="text-slate-400 hover:text-slate-100 text-lg p-1">
+              ✕
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <div 
+              v-for="overview in characterProgressOverview" 
+              :key="overview.id" 
+              class="bg-slate-900/80 p-3.5 rounded-xl border transition"
+              :class="overview.id === activeCharId ? 'border-amber-500/80 ring-1 ring-amber-500/30' : 'border-slate-700/70'"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-bold text-sm flex items-center gap-1.5 text-slate-200">
+                  <span>👤</span>
+                  <span>{{ overview.name }}</span>
+                  <span v-if="overview.id === activeCharId" class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40 ml-1">當前</span>
+                </span>
+
+                <button 
+                  v-if="overview.id !== activeCharId"
+                  @click="switchCharacterFromDashboard(overview.id)" 
+                  class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-600 transition"
+                >
+                  切換至此角色
+                </button>
+              </div>
+
+              <!-- 每日進度條 -->
+              <div class="space-y-1 mb-2">
+                <div class="flex justify-between text-xs text-slate-400 font-mono">
+                  <span>📅 每日任務: {{ overview.dailyDone }}/{{ overview.dailyTotal }}</span>
+                  <span class="font-bold" :class="overview.dailyPercent === 100 ? 'text-amber-400' : 'text-emerald-400'">{{ overview.dailyPercent }}%</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50">
+                  <div class="h-full transition-all duration-300" :class="overview.dailyPercent === 100 ? 'bg-amber-400' : 'bg-emerald-500'" :style="{ width: overview.dailyPercent + '%' }"></div>
+                </div>
+              </div>
+
+              <!-- 每週進度條 -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-slate-400 font-mono">
+                  <span>🗓️ 每週任務: {{ overview.weeklyDone }}/{{ overview.weeklyTotal }}</span>
+                  <span class="font-bold" :class="overview.weeklyPercent === 100 ? 'text-amber-400' : 'text-sky-400'">{{ overview.weeklyPercent }}%</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50">
+                  <div class="h-full transition-all duration-300" :class="overview.weeklyPercent === 100 ? 'bg-amber-400' : 'bg-sky-500'" :style="{ width: overview.weeklyPercent + '%' }"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="text-right pt-2 border-t border-slate-700">
+            <button @click="showDashboard = false" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs rounded-lg transition font-medium">
+              關閉
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </transition>
 
   </div>
 
@@ -258,22 +463,42 @@
           { id: 'other', name: '其他', icon: '📌' }
         ];
 
-        const dailyTasks = ref([
-          { id: 'd1', title: '每日公會簽到', done: false, category: 'guild' },
-          { id: 'd2', title: '每日地下城討伐 (3/3)', done: false, category: 'dungeon' },
-          { id: 'd3', title: '購買每日限購商店物資', done: false, category: 'shop' }
-        ]);
+        // 預設常態任務範本
+        const presetDailyTasks = [
+          { id: 'p_d1', title: '每日公會簽到', done: false, pinned: false, category: 'guild' },
+          { id: 'p_d2', title: '每日地下城討伐', done: false, pinned: true, category: 'dungeon', currentCount: 0, maxCount: 3 },
+          { id: 'p_d3', title: '每日限購商店物資購買', done: false, pinned: false, category: 'shop' },
+          { id: 'p_d4', title: '每日生活採集/生產', done: false, pinned: false, category: 'life' }
+        ];
 
-        const weeklyTasks = ref([
-          { id: 'w1', title: '每週團隊副本', done: false, category: 'dungeon' },
-          { id: 'w2', title: '每週公會任務達成', done: false, category: 'guild' }
+        const presetWeeklyTasks = [
+          { id: 'p_w1', title: '每週團隊副本討伐', done: false, pinned: true, category: 'dungeon', currentCount: 0, maxCount: 2 },
+          { id: 'p_w2', title: '每週公會貢獻任務', done: false, pinned: false, category: 'guild' },
+          { id: 'p_w3', title: '每週限額物資兌換', done: false, pinned: false, category: 'shop' }
+        ];
+
+        const characters = ref([
+          { id: 'char_1', name: '主要角色' }
         ]);
+        const activeCharId = ref('char_1');
+        const showDashboard = ref(false);
+
+        // 儲存各角色的獨立任務資料
+        const characterTasks = ref({
+          char_1: {
+            dailyTasks: JSON.parse(JSON.stringify(presetDailyTasks)),
+            weeklyTasks: JSON.parse(JSON.stringify(presetWeeklyTasks))
+          }
+        });
 
         const lastDate = ref('');
         const lastWeekKey = ref('');
         const newTaskTitle = ref('');
         const newTaskType = ref('daily');
         const newTaskCategory = ref('dungeon');
+        const newTaskPinned = ref(false);
+        const hasCountLimit = ref(false);
+        const maxCountInput = ref(3);
         
         const dailyFilter = ref('all');
         const weeklyFilter = ref('all');
@@ -283,53 +508,96 @@
         const weeklyCountdownText = ref('0天 00:00:00');
         let timer = null;
 
+        const currentCharacterName = computed(() => {
+          const char = characters.value.find(c => c.id === activeCharId.value);
+          return char ? char.name : '未知角色';
+        });
+
+        const currentDailyTasks = computed(() => {
+          if (!characterTasks.value[activeCharId.value]) return [];
+          return characterTasks.value[activeCharId.value].dailyTasks || [];
+        });
+
+        const currentWeeklyTasks = computed(() => {
+          if (!characterTasks.value[activeCharId.value]) return [];
+          return characterTasks.value[activeCharId.value].weeklyTasks || [];
+        });
+
+        // 計算全角色的進度總覽數據
+        const characterProgressOverview = computed(() => {
+          return characters.value.map(char => {
+            const charData = characterTasks.value[char.id] || { dailyTasks: [], weeklyTasks: [] };
+            const dTasks = charData.dailyTasks || [];
+            const wTasks = charData.weeklyTasks || [];
+
+            const dDone = dTasks.filter(t => t.done).length;
+            const wDone = wTasks.filter(t => t.done).length;
+
+            const dPercent = dTasks.length === 0 ? 0 : Math.round((dDone / dTasks.length) * 100);
+            const wPercent = wTasks.length === 0 ? 0 : Math.round((wDone / wTasks.length) * 100);
+
+            return {
+              id: char.id,
+              name: char.name,
+              dailyDone: dDone,
+              dailyTotal: dTasks.length,
+              dailyPercent: dPercent,
+              weeklyDone: wDone,
+              weeklyTotal: wTasks.length,
+              weeklyPercent: wPercent
+            };
+          });
+        });
+
         const getCategoryInfo = (catId) => {
           return categories.find(c => c.id === catId) || { name: '其他', icon: '📌' };
         };
 
+        const sortTasks = (tasks) => {
+          return [...tasks].sort((a, b) => {
+            if (a.done !== b.done) return Number(a.done) - Number(b.done);
+            if (a.pinned !== b.pinned) return Number(b.pinned) - Number(a.pinned);
+            return 0;
+          });
+        };
+
         const filteredDailyTasks = computed(() => {
-          let list = dailyTasks.value;
+          let list = currentDailyTasks.value;
           if (dailyFilter.value !== 'all') {
             list = list.filter(t => t.category === dailyFilter.value);
           }
-          return [...list].sort((a, b) => Number(a.done) - Number(b.done));
+          return sortTasks(list);
         });
 
         const filteredWeeklyTasks = computed(() => {
-          let list = weeklyTasks.value;
+          let list = currentWeeklyTasks.value;
           if (weeklyFilter.value !== 'all') {
             list = list.filter(t => t.category === weeklyFilter.value);
           }
-          return [...list].sort((a, b) => Number(a.done) - Number(b.done));
+          return sortTasks(list);
         });
 
-        const dailyDoneCount = computed(() => dailyTasks.value.filter(t => t.done).length);
+        const dailyDoneCount = computed(() => currentDailyTasks.value.filter(t => t.done).length);
         const dailyProgress = computed(() => {
-          if (dailyTasks.value.length === 0) return 0;
-          return Math.round((dailyDoneCount.value / dailyTasks.value.length) * 100);
+          if (currentDailyTasks.value.length === 0) return 0;
+          return Math.round((dailyDoneCount.value / currentDailyTasks.value.length) * 100);
         });
 
-        const weeklyDoneCount = computed(() => weeklyTasks.value.filter(t => t.done).length);
+        const weeklyDoneCount = computed(() => currentWeeklyTasks.value.filter(t => t.done).length);
         const weeklyProgress = computed(() => {
-          if (weeklyTasks.value.length === 0) return 0;
-          return Math.round((weeklyDoneCount.value / weeklyTasks.value.length) * 100);
+          if (currentWeeklyTasks.value.length === 0) return 0;
+          return Math.round((weeklyDoneCount.value / currentWeeklyTasks.value.length) * 100);
         });
 
-        // 取得考量 06:00 點重置的日期字串
         const getCustomDateString = (date = new Date()) => {
           const d = new Date(date);
-          if (d.getHours() < 6) {
-            d.setDate(d.getDate() - 1);
-          }
+          if (d.getHours() < 6) d.setDate(d.getDate() - 1);
           return d.toISOString().split('T')[0];
         };
 
-        // 取得考量 週一 06:00 點重置的週次 Key
         const getCustomWeekKey = (date = new Date()) => {
           const d = new Date(date);
-          if (d.getHours() < 6) {
-            d.setDate(d.getDate() - 1);
-          }
+          if (d.getHours() < 6) d.setDate(d.getDate() - 1);
           const utcDate = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
           const dayNum = utcDate.getUTCDay() || 7;
           utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum);
@@ -338,50 +606,32 @@
           return `${utcDate.getUTCFullYear()}-W${weekNo < 10 ? '0' + weekNo : weekNo}`;
         };
 
-        // ⏳ 計算距離每日重置 (凌晨 06:00) 的倒數時間
         const updateDailyCountdown = () => {
           const now = new Date();
           const target = new Date();
-
           target.setHours(6, 0, 0, 0);
-
-          if (now >= target) {
-            target.setDate(target.getDate() + 1);
-          }
+          if (now >= target) target.setDate(target.getDate() + 1);
 
           const diffMs = target - now;
-
-          if (diffMs <= 1000) {
-            loadData();
-          }
+          if (diffMs <= 1000) loadData();
 
           const totalSeconds = Math.floor(diffMs / 1000);
           const hours = Math.floor(totalSeconds / 3600);
           const minutes = Math.floor((totalSeconds % 3600) / 60);
           const seconds = totalSeconds % 60;
-
           const pad = (num) => String(num).padStart(2, '0');
           dailyCountdownText.value = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
         };
 
-        // ⏳ 計算距離每週重置 (週一 06:00 AM) 的倒數時間
         const updateWeeklyCountdown = () => {
           const now = new Date();
           const target = new Date();
-
           target.setHours(6, 0, 0, 0);
-
-          // 計算距離下個星期一還有幾天 (0是週日，1是週一)
           const currentDay = now.getDay();
           let daysUntilMonday = (1 + 7 - currentDay) % 7;
-
-          // 若今天就是週一，但已經過了 06:00 AM，目標推算到下週一
-          if (daysUntilMonday === 0 && now >= target) {
-            daysUntilMonday = 7;
-          }
+          if (daysUntilMonday === 0 && now >= target) daysUntilMonday = 7;
 
           target.setDate(now.getDate() + daysUntilMonday);
-
           const diffMs = target - now;
 
           const totalSeconds = Math.floor(diffMs / 1000);
@@ -389,7 +639,6 @@
           const hours = Math.floor((totalSeconds % 86400) / 3600);
           const minutes = Math.floor((totalSeconds % 3600) / 60);
           const seconds = totalSeconds % 60;
-
           const pad = (num) => String(num).padStart(2, '0');
           weeklyCountdownText.value = `${days}天 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
         };
@@ -399,30 +648,78 @@
           updateWeeklyCountdown();
         };
 
+        const resetTaskProgress = (task) => {
+          task.done = false;
+          if (task.maxCount) task.currentCount = 0;
+        };
+
+        const switchCharacter = (charId) => {
+          activeCharId.value = charId;
+          saveData();
+        };
+
+        const switchCharacterFromDashboard = (charId) => {
+          switchCharacter(charId);
+          showDashboard.value = false;
+        };
+
+        const addNewCharacter = () => {
+          const name = prompt('請輸入新角色/分身名稱：', `分身 ${characters.value.length + 1}`);
+          if (!name || !name.trim()) return;
+
+          const newId = 'char_' + Date.now();
+          characters.value.push({ id: newId, name: name.trim() });
+          
+          characterTasks.value[newId] = {
+            dailyTasks: JSON.parse(JSON.stringify(presetDailyTasks)),
+            weeklyTasks: JSON.parse(JSON.stringify(presetWeeklyTasks))
+          };
+
+          activeCharId.value = newId;
+          saveData();
+        };
+
+        const deleteCurrentCharacter = () => {
+          if (characters.value.length <= 1) {
+            alert('⚠️ 至少需要保留一個角色！');
+            return;
+          }
+
+          if (confirm(`確定要刪除角色【${currentCharacterName.value}】及其所有任務進度嗎？`)) {
+            const delId = activeCharId.value;
+            characters.value = characters.value.filter(c => c.id !== delId);
+            delete characterTasks.value[delId];
+            activeCharId.value = characters.value[0].id;
+            saveData();
+          }
+        };
+
         const loadData = () => {
-          const savedData = localStorage.getItem('mabinogi_tasks');
+          const savedData = localStorage.getItem('mabinogi_tasks_multi');
           const todayKey = getCustomDateString();
           const currentWeekKey = getCustomWeekKey();
 
           if (savedData) {
             const parsed = JSON.parse(savedData);
+            characters.value = parsed.characters || [{ id: 'char_1', name: '主要角色' }];
+            activeCharId.value = parsed.activeCharId || characters.value[0].id;
+            characterTasks.value = parsed.characterTasks || {};
 
-            dailyTasks.value = (parsed.dailyTasks || []).map(t => ({ category: 'other', ...t }));
-            weeklyTasks.value = (parsed.weeklyTasks || []).map(t => ({ category: 'other', ...t }));
-            
-            if (parsed.lastDate !== todayKey) {
-              dailyTasks.value.forEach(t => t.done = false);
-              parsed.lastDate = todayKey;
-            }
+            let needResetDaily = parsed.lastDate !== todayKey;
+            let needResetWeekly = parsed.lastWeekKey !== currentWeekKey;
 
-            if (parsed.lastWeekKey !== currentWeekKey) {
-              weeklyTasks.value.forEach(t => t.done = false);
-              parsed.lastWeekKey = currentWeekKey;
-            }
+            Object.keys(characterTasks.value).forEach(cId => {
+              const charData = characterTasks.value[cId];
+              if (needResetDaily && charData.dailyTasks) {
+                charData.dailyTasks.forEach(resetTaskProgress);
+              }
+              if (needResetWeekly && charData.weeklyTasks) {
+                charData.weeklyTasks.forEach(resetTaskProgress);
+              }
+            });
 
-            lastDate.value = parsed.lastDate;
-            lastWeekKey.value = parsed.lastWeekKey;
-
+            lastDate.value = todayKey;
+            lastWeekKey.value = currentWeekKey;
             saveData();
           } else {
             lastDate.value = todayKey;
@@ -435,17 +732,48 @@
           const data = {
             lastDate: getCustomDateString(),
             lastWeekKey: getCustomWeekKey(),
-            dailyTasks: dailyTasks.value,
-            weeklyTasks: weeklyTasks.value
+            activeCharId: activeCharId.value,
+            characters: characters.value,
+            characterTasks: characterTasks.value
           };
-          localStorage.setItem('mabinogi_tasks', JSON.stringify(data));
+          localStorage.setItem('mabinogi_tasks_multi', JSON.stringify(data));
           lastDate.value = data.lastDate;
           lastWeekKey.value = data.lastWeekKey;
         };
 
         const toggleTask = (task) => {
           task.done = !task.done;
+          if (task.maxCount) {
+            task.currentCount = task.done ? task.maxCount : 0;
+          }
           saveData();
+        };
+
+        const togglePin = (task) => {
+          task.pinned = !task.pinned;
+          saveData();
+        };
+
+        const incrementCount = (task) => {
+          if (!task.maxCount) return;
+          if ((task.currentCount || 0) < task.maxCount) {
+            task.currentCount = (task.currentCount || 0) + 1;
+            if (task.currentCount === task.maxCount) {
+              task.done = true;
+            }
+            saveData();
+          }
+        };
+
+        const decrementCount = (task) => {
+          if (!task.maxCount) return;
+          if ((task.currentCount || 0) > 0) {
+            task.currentCount = task.currentCount - 1;
+            if (task.currentCount < task.maxCount) {
+              task.done = false;
+            }
+            saveData();
+          }
         };
 
         const addTask = () => {
@@ -455,44 +783,88 @@
             id: Date.now().toString(),
             title: newTaskTitle.value.trim(),
             done: false,
+            pinned: newTaskPinned.value,
             category: newTaskCategory.value
           };
 
+          if (hasCountLimit.value && maxCountInput.value > 1) {
+            newTask.maxCount = maxCountInput.value;
+            newTask.currentCount = 0;
+          }
+
+          const currentTasks = characterTasks.value[activeCharId.value];
+          if (!currentTasks) return;
+
           if (newTaskType.value === 'daily') {
-            dailyTasks.value.push(newTask);
+            currentTasks.dailyTasks.push(newTask);
           } else {
-            weeklyTasks.value.push(newTask);
+            currentTasks.weeklyTasks.push(newTask);
           }
 
           newTaskTitle.value = '';
+          newTaskPinned.value = false;
+          hasCountLimit.value = false;
+          saveData();
+        };
+
+        const loadPresetTemplates = () => {
+          const currentTasks = characterTasks.value[activeCharId.value];
+          if (!currentTasks) return;
+
+          if (currentTasks.dailyTasks.length > 0 || currentTasks.weeklyTasks.length > 0) {
+            if (!confirm(`載入範本會將常態任務補充至【${currentCharacterName.value}】的清單中，是否繼續？`)) return;
+          }
+          
+          presetDailyTasks.forEach(pt => {
+            if (!currentTasks.dailyTasks.some(t => t.title === pt.title)) {
+              currentTasks.dailyTasks.push(JSON.parse(JSON.stringify(pt)));
+            }
+          });
+
+          presetWeeklyTasks.forEach(pt => {
+            if (!currentTasks.weeklyTasks.some(t => t.title === pt.title)) {
+              currentTasks.weeklyTasks.push(JSON.parse(JSON.stringify(pt)));
+            }
+          });
+
           saveData();
         };
 
         const deleteTask = (type, id) => {
+          const currentTasks = characterTasks.value[activeCharId.value];
+          if (!currentTasks) return;
+
           if (type === 'daily') {
-            dailyTasks.value = dailyTasks.value.filter(task => task.id !== id);
+            currentTasks.dailyTasks = currentTasks.dailyTasks.filter(task => task.id !== id);
           } else {
-            weeklyTasks.value = weeklyTasks.value.filter(task => task.id !== id);
+            currentTasks.weeklyTasks = currentTasks.weeklyTasks.filter(task => task.id !== id);
           }
           saveData();
         };
 
         const resetDaily = () => {
-          dailyTasks.value.forEach(t => t.done = false);
-          saveData();
+          const currentTasks = characterTasks.value[activeCharId.value];
+          if (currentTasks && currentTasks.dailyTasks) {
+            currentTasks.dailyTasks.forEach(resetTaskProgress);
+            saveData();
+          }
         };
 
         const resetWeekly = () => {
-          weeklyTasks.value.forEach(t => t.done = false);
-          saveData();
+          const currentTasks = characterTasks.value[activeCharId.value];
+          if (currentTasks && currentTasks.weeklyTasks) {
+            currentTasks.weeklyTasks.forEach(resetTaskProgress);
+            saveData();
+          }
         };
 
         const exportData = () => {
           const data = {
             lastDate: getCustomDateString(),
             lastWeekKey: getCustomWeekKey(),
-            dailyTasks: dailyTasks.value,
-            weeklyTasks: weeklyTasks.value
+            activeCharId: activeCharId.value,
+            characters: characters.value,
+            characterTasks: characterTasks.value
           };
           const jsonStr = JSON.stringify(data, null, 2);
           const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -500,7 +872,7 @@
           
           const a = document.createElement('a');
           a.href = url;
-          a.download = `mabinogi_tasks_backup_${getCustomDateString()}.json`;
+          a.download = `mabinogi_tasks_multi_${getCustomDateString()}.json`;
           a.click();
           URL.revokeObjectURL(url);
         };
@@ -517,13 +889,14 @@
           reader.onload = (e) => {
             try {
               const parsed = JSON.parse(e.target.result);
-              if (Array.isArray(parsed.dailyTasks) && Array.isArray(parsed.weeklyTasks)) {
-                dailyTasks.value = parsed.dailyTasks.map(t => ({ category: 'other', ...t }));
-                weeklyTasks.value = parsed.weeklyTasks.map(t => ({ category: 'other', ...t }));
+              if (parsed.characters && parsed.characterTasks) {
+                characters.value = parsed.characters;
+                activeCharId.value = parsed.activeCharId || characters.value[0].id;
+                characterTasks.value = parsed.characterTasks;
                 saveData();
-                alert('🎉 任務備份匯入成功！');
+                alert('🎉 包含所有角色的任務備份匯入成功！');
               } else {
-                alert('⚠️ 檔案格式不符合瑪奇任務清單規格！');
+                alert('⚠️ 檔案格式不符合多角色任務清單規格！');
               }
             } catch (err) {
               alert('❌ 解析 JSON 檔案失敗，請確認檔案格式是否正確。');
@@ -545,10 +918,15 @@
 
         return {
           categories,
-          dailyTasks,
-          weeklyTasks,
+          characters,
+          activeCharId,
+          showDashboard,
+          currentCharacterName,
+          currentDailyTasks,
+          currentWeeklyTasks,
           filteredDailyTasks,
           filteredWeeklyTasks,
+          characterProgressOverview,
           dailyFilter,
           weeklyFilter,
           lastDate,
@@ -556,6 +934,9 @@
           newTaskTitle,
           newTaskType,
           newTaskCategory,
+          newTaskPinned,
+          hasCountLimit,
+          maxCountInput,
           fileInput,
           dailyCountdownText,
           weeklyCountdownText,
@@ -564,8 +945,16 @@
           weeklyDoneCount,
           weeklyProgress,
           getCategoryInfo,
+          switchCharacter,
+          switchCharacterFromDashboard,
+          addNewCharacter,
+          deleteCurrentCharacter,
           toggleTask,
+          togglePin,
+          incrementCount,
+          decrementCount,
           addTask,
+          loadPresetTemplates,
           deleteTask,
           resetDaily,
           resetWeekly,
