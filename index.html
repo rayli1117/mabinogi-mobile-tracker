@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>瑪奇 Mobile - 每日/每週任務清單</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+  <div id="app" class="max-w-2xl mx-auto space-y-6">
+    
+    <!-- 頁面標題與重置按鈕 -->
+    <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-slate-700 pb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-amber-400">瑪奇 Mobile 任務助手</h1>
+        <p class="text-xs text-slate-400 mt-1">
+          上次每日重置: {{ lastDate }} | 上次每週重置: {{ lastWeekKey }}
+        </p>
+      </div>
+      <div class="flex gap-2">
+        <button @click="resetDaily" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-600 transition">
+          重置每日
+        </button>
+        <button @click="resetWeekly" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded border border-slate-600 transition">
+          重置每週
+        </button>
+      </div>
+    </header>
+
+    <!-- 新增任務輸入區塊 -->
+    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+      <h3 class="text-sm font-semibold text-slate-300 mb-3">➕ 新增任務</h3>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input 
+          v-model="newTaskTitle" 
+          @keyup.enter="addTask"
+          type="text" 
+          placeholder="輸入任務名稱 (例: 每週團隊副本)..." 
+          class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 transition"
+        />
+        <select 
+          v-model="newTaskType" 
+          class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
+        >
+          <option value="daily">📅 每日任務</option>
+          <option value="weekly">🗓️ 每週任務</option>
+        </select>
+        <button 
+          @click="addTask" 
+          class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg text-sm transition"
+        >
+          新增
+        </button>
+      </div>
+    </section>
+
+    <!-- 每日任務區塊 -->
+    <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+      <h2 class="text-lg font-semibold text-emerald-400 mb-4 flex items-center justify-between">
+        <span>📅 每日任務</span>
+        <span class="text-xs font-normal text-slate-400">點擊任務切換完成狀態</span>
+      </h2>
+      <p v-if="dailyTasks.length === 0" class="text-slate-500 text-sm italic py-2">目前沒有每日任務，請從上方新增！</p>
+      <ul class="space-y-3">
+        <li v-for="task in dailyTasks" :key="task.id" 
+            class="flex items-center justify-between p-3 rounded-lg border transition select-none group"
+            :class="task.done ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
+          
+          <div @click="toggleTask(task)" class="flex-1 flex items-center gap-3 cursor-pointer">
+            <span class="text-lg">{{ task.done ? '✅' : '⬜' }}</span>
+            <span :class="{ 'line-through': task.done }">{{ task.title }}</span>
+          </div>
+
+          <button 
+            @click.stop="deleteTask('daily', task.id)" 
+            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+            title="刪除任務"
+          >
+            🗑️
+          </button>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 每週任務區塊 -->
+    <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+      <h2 class="text-lg font-semibold text-sky-400 mb-4 flex items-center justify-between">
+        <span>🗓️ 每週任務 (週一重置)</span>
+        <span class="text-xs font-normal text-slate-400">點擊任務切換完成狀態</span>
+      </h2>
+      <p v-if="weeklyTasks.length === 0" class="text-slate-500 text-sm italic py-2">目前沒有每週任務，請從上方新增！</p>
+      <ul class="space-y-3">
+        <li v-for="task in weeklyTasks" :key="task.id" 
+            class="flex items-center justify-between p-3 rounded-lg border transition select-none group"
+            :class="task.done ? 'bg-slate-900/50 border-slate-800 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'">
+          
+          <div @click="toggleTask(task)" class="flex-1 flex items-center gap-3 cursor-pointer">
+            <span class="text-lg">{{ task.done ? '✅' : '⬜' }}</span>
+            <span :class="{ 'line-through': task.done }">{{ task.title }}</span>
+          </div>
+
+          <button 
+            @click.stop="deleteTask('weekly', task.id)" 
+            class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+            title="刪除任務"
+          >
+            🗑️
+          </button>
+        </li>
+      </ul>
+    </section>
+
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const dailyTasks = ref([
+          { id: 'd1', title: '每日公會簽到', done: false },
+          { id: 'd2', title: '每日地下城討伐 (3/3)', done: false },
+          { id: 'd3', title: '購買每日限購商店物資', done: false }
+        ]);
+
+        const weeklyTasks = ref([
+          { id: 'w1', title: '每週團隊副本', done: false },
+          { id: 'w2', title: '每週公會任務達成', done: false }
+        ]);
+
+        const lastDate = ref('');
+        const lastWeekKey = ref('');
+        const newTaskTitle = ref('');
+        const newTaskType = ref('daily');
+
+        // 取得今天的日期字串 (YYYY-MM-DD)
+        const getTodayString = () => new Date().toISOString().split('T')[0];
+
+        // 取得當前 ISO 週數識別碼 (格式: "2026-W32")
+        // 國際 ISO 8601 標準：每週從週一開始，第 1 週包含當年的第一個週四
+        const getISOWeekKey = (date = new Date()) => {
+          const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+          const dayNum = d.getUTCDay() || 7; // 週一=1, 週日=7
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum); // 移至該週的週四
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+          return `${d.getUTCFullYear()}-W${weekNo < 10 ? '0' + weekNo : weekNo}`;
+        };
+
+        // 讀取 LocalStorage 資料與進行自動重置判斷
+        const loadData = () => {
+          const savedData = localStorage.getItem('mabinogi_tasks');
+          const today = getTodayString();
+          const currentWeekKey = getISOWeekKey();
+
+          if (savedData) {
+            const parsed = JSON.parse(savedData);
+
+            dailyTasks.value = parsed.dailyTasks || [];
+            weeklyTasks.value = parsed.weeklyTasks || [];
+            
+            // 1. 每日自動重置檢查 (如果跨日，重置每日任務)
+            if (parsed.lastDate !== today) {
+              dailyTasks.value.forEach(t => t.done = false);
+              parsed.lastDate = today;
+            }
+
+            // 2. 每週自動重置檢查 (如果 ISO 週數改變，代表過了週日午夜來到新一週)
+            if (parsed.lastWeekKey !== currentWeekKey) {
+              weeklyTasks.value.forEach(t => t.done = false);
+              parsed.lastWeekKey = currentWeekKey;
+            }
+
+            lastDate.value = parsed.lastDate;
+            lastWeekKey.value = parsed.lastWeekKey;
+
+            // 儲存重置後的狀態
+            saveData();
+          } else {
+            lastDate.value = today;
+            lastWeekKey.value = currentWeekKey;
+            saveData();
+          }
+        };
+
+        // 儲存資料到 LocalStorage
+        const saveData = () => {
+          const data = {
+            lastDate: getTodayString(),
+            lastWeekKey: getISOWeekKey(),
+            dailyTasks: dailyTasks.value,
+            weeklyTasks: weeklyTasks.value
+          };
+          localStorage.setItem('mabinogi_tasks', JSON.stringify(data));
+          lastDate.value = data.lastDate;
+          lastWeekKey.value = data.lastWeekKey;
+        };
+
+        // 切換任務完成狀態
+        const toggleTask = (task) => {
+          task.done = !task.done;
+          saveData();
+        };
+
+        // 新增任務
+        const addTask = () => {
+          if (!newTaskTitle.value.trim()) return;
+
+          const newTask = {
+            id: Date.now().toString(),
+            title: newTaskTitle.value.trim(),
+            done: false
+          };
+
+          if (newTaskType.value === 'daily') {
+            dailyTasks.value.push(newTask);
+          } else {
+            weeklyTasks.value.push(newTask);
+          }
+
+          newTaskTitle.value = '';
+          saveData();
+        };
+
+        // 刪除任務
+        const deleteTask = (type, id) => {
+          if (type === 'daily') {
+            dailyTasks.value = dailyTasks.value.filter(task => task.id !== id);
+          } else {
+            weeklyTasks.value = weeklyTasks.value.filter(task => task.id !== id);
+          }
+          saveData();
+        };
+
+        // 手動重置每日任務
+        const resetDaily = () => {
+          dailyTasks.value.forEach(t => t.done = false);
+          saveData();
+        };
+
+        // 手動重置每週任務
+        const resetWeekly = () => {
+          weeklyTasks.value.forEach(t => t.done = false);
+          saveData();
+        };
+
+        onMounted(() => {
+          loadData();
+        });
+
+        return {
+          dailyTasks,
+          weeklyTasks,
+          lastDate,
+          lastWeekKey,
+          newTaskTitle,
+          newTaskType,
+          toggleTask,
+          addTask,
+          deleteTask,
+          resetDaily,
+          resetWeekly
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
