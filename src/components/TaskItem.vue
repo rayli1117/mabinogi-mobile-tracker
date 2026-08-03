@@ -102,6 +102,12 @@ function onRowClick() {
         {{ task.title }}
       </span>
 
+      <span
+        v-if="task.scope === 'account'"
+        class="text-[10px] px-1.5 py-0.5 rounded bg-violet-950/50 border border-violet-500/40 text-violet-300 font-normal shrink-0"
+      >
+        帳號
+      </span>
       <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal shrink-0 hidden sm:inline-block">
         {{ getCategoryInfo(task.category).icon }} {{ getCategoryInfo(task.category).name }}
       </span>

@@ -8,6 +8,7 @@ const {
   newTaskTitle,
   newTaskCategory,
   newTaskType,
+  newTaskScope,
   hasCountLimit,
   maxCountInput,
   newTaskPinned,
@@ -20,7 +21,14 @@ const {
     v-if="editMode"
     class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg space-y-3"
   >
-    <h3 class="text-sm font-semibold text-slate-300">➕ 為【{{ currentCharacterName }}】新增任務</h3>
+    <h3 class="text-sm font-semibold text-slate-300">
+      ➕
+      {{
+        newTaskScope === 'account'
+          ? '為【帳號共用】新增任務'
+          : `為【${currentCharacterName}】新增任務`
+      }}
+    </h3>
     <div class="flex flex-col gap-2">
       <div class="flex flex-col sm:flex-row gap-2">
         <input
@@ -30,6 +38,13 @@ const {
           placeholder="輸入任務名稱 (例: 每日地下城討伐)..."
           class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 transition"
         />
+        <select
+          v-model="newTaskScope"
+          class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"
+        >
+          <option value="character">👤 角色</option>
+          <option value="account">🌐 帳號</option>
+        </select>
         <select
           v-model="newTaskCategory"
           class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 text-slate-300"

@@ -4,6 +4,7 @@ import { useTaskManager } from '../composables/useTaskManager'
 const {
   showDashboard,
   characterProgressOverview,
+  accountProgressOverview,
   activeCharId,
   switchCharacterFromDashboard,
 } = useTaskManager()
@@ -27,6 +28,53 @@ const {
         </div>
 
         <div class="space-y-3">
+          <div class="bg-slate-900/80 p-3.5 rounded-xl border border-violet-500/40 ring-1 ring-violet-500/20">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-sm flex items-center gap-1.5 text-slate-200">
+                <span>🌐</span>
+                <span>帳號共用</span>
+              </span>
+            </div>
+
+            <div class="space-y-1 mb-2">
+              <div class="flex justify-between text-xs text-slate-400 font-mono">
+                <span>📅 每日任務: {{ accountProgressOverview.dailyDone }}/{{ accountProgressOverview.dailyTotal }}</span>
+                <span
+                  class="font-bold"
+                  :class="accountProgressOverview.dailyPercent === 100 ? 'text-amber-400' : 'text-emerald-400'"
+                >
+                  {{ accountProgressOverview.dailyPercent }}%
+                </span>
+              </div>
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50">
+                <div
+                  class="h-full transition-all duration-300"
+                  :class="accountProgressOverview.dailyPercent === 100 ? 'bg-amber-400' : 'bg-emerald-500'"
+                  :style="{ width: accountProgressOverview.dailyPercent + '%' }"
+                ></div>
+              </div>
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs text-slate-400 font-mono">
+                <span>🗓️ 每週任務: {{ accountProgressOverview.weeklyDone }}/{{ accountProgressOverview.weeklyTotal }}</span>
+                <span
+                  class="font-bold"
+                  :class="accountProgressOverview.weeklyPercent === 100 ? 'text-amber-400' : 'text-sky-400'"
+                >
+                  {{ accountProgressOverview.weeklyPercent }}%
+                </span>
+              </div>
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50">
+                <div
+                  class="h-full transition-all duration-300"
+                  :class="accountProgressOverview.weeklyPercent === 100 ? 'bg-amber-400' : 'bg-sky-500'"
+                  :style="{ width: accountProgressOverview.weeklyPercent + '%' }"
+                ></div>
+              </div>
+            </div>
+          </div>
+
           <div
             v-for="overview in characterProgressOverview"
             :key="overview.id"

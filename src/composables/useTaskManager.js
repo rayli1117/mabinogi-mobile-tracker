@@ -5,22 +5,34 @@ const STORAGE_KEY = 'mabinogi_tasks_multi'
 export const categories = [
   { id: 'dungeon', name: '副本討伐', icon: '⚔️' },
   { id: 'guild', name: '公會活動', icon: '🏰' },
+  { id: 'parttime', name: '兼職', icon: '💼' },
   { id: 'life', name: '生活/採集', icon: '🌿' },
   { id: 'shop', name: '商店買賣', icon: '🛒' },
   { id: 'other', name: '其他', icon: '📌' },
 ]
 
-const presetDailyTasks = [
-  { id: 'p_d1', title: '每日公會簽到', done: false, pinned: false, category: 'guild' },
-  { id: 'p_d2', title: '每日地下城討伐', done: false, pinned: true, category: 'dungeon', currentCount: 0, maxCount: 3 },
-  { id: 'p_d3', title: '每日限購商店物資購買', done: false, pinned: false, category: 'shop' },
-  { id: 'p_d4', title: '每日生活採集/生產', done: false, pinned: false, category: 'life' },
+const presetCharacterDailyTasks = [
+  { id: 'p_cd1', title: '每日挑戰', done: false, pinned: false, category: 'other' },
+  { id: 'p_cd2', title: '週幾兼職', done: false, pinned: false, category: 'parttime' },
 ]
 
-const presetWeeklyTasks = [
-  { id: 'p_w1', title: '每週團隊副本討伐', done: false, pinned: true, category: 'dungeon', currentCount: 0, maxCount: 2 },
-  { id: 'p_w2', title: '每週公會貢獻任務', done: false, pinned: false, category: 'guild' },
-  { id: 'p_w3', title: '每週限額物資兌換', done: false, pinned: false, category: 'shop' },
+const presetAccountDailyTasks = [
+  { id: 'p_ad1', title: '每日公會簽到', done: false, pinned: false, category: 'guild', scope: 'account' },
+]
+
+const presetCharacterWeeklyTasks = [
+  { id: 'p_cw1', title: '會員兼職', done: false, pinned: false, category: 'parttime' },
+  { id: 'p_cw2', title: '一般兼職', done: false, pinned: false, category: 'parttime', currentCount: 0, maxCount: 6 },
+  { id: 'p_cw3', title: '魔物討伐證明', done: false, pinned: false, category: 'shop' },
+  { id: 'p_cw4', title: '野外首領', done: false, pinned: false, category: 'dungeon' },
+  { id: 'p_cw5', title: '深淵', done: false, pinned: false, category: 'dungeon', currentCount: 0, maxCount: 3 },
+  { id: 'p_cw6', title: '不祥的召喚結界', done: false, pinned: false, category: 'dungeon', currentCount: 0, maxCount: 7 },
+  { id: 'p_cw7', title: '黑色坑洞', done: false, pinned: false, category: 'dungeon', currentCount: 0, maxCount: 14 },
+]
+
+const presetAccountWeeklyTasks = [
+  { id: 'p_aw1', title: '每週愛心幣聖水', done: false, pinned: false, category: 'shop', scope: 'account', currentCount: 0, maxCount: 20 },
+  { id: 'p_aw2', title: '每週挑戰', done: false, pinned: false, category: 'other', scope: 'account' },
 ]
 
 // Module-level singleton state (shared across all components)
@@ -31,9 +43,13 @@ const showImportExport = ref(false)
 const editMode = ref(false)
 const characterTasks = ref({
   char_1: {
-    dailyTasks: JSON.parse(JSON.stringify(presetDailyTasks)),
-    weeklyTasks: JSON.parse(JSON.stringify(presetWeeklyTasks)),
+    dailyTasks: JSON.parse(JSON.stringify(presetCharacterDailyTasks)),
+    weeklyTasks: JSON.parse(JSON.stringify(presetCharacterWeeklyTasks)),
   },
+})
+const accountTasks = ref({
+  dailyTasks: JSON.parse(JSON.stringify(presetAccountDailyTasks)),
+  weeklyTasks: JSON.parse(JSON.stringify(presetAccountWeeklyTasks)),
 })
 
 const lastDate = ref('')
@@ -41,6 +57,7 @@ const lastWeekKey = ref('')
 const newTaskTitle = ref('')
 const newTaskType = ref('daily')
 const newTaskCategory = ref('dungeon')
+const newTaskScope = ref('character')
 const newTaskPinned = ref(false)
 const hasCountLimit = ref(false)
 const maxCountInput = ref(3)
@@ -96,9 +113,16 @@ function getDefaultCharacters() {
 function getDefaultCharacterTasks() {
   return {
     char_1: {
-      dailyTasks: JSON.parse(JSON.stringify(presetDailyTasks)),
-      weeklyTasks: JSON.parse(JSON.stringify(presetWeeklyTasks)),
+      dailyTasks: JSON.parse(JSON.stringify(presetCharacterDailyTasks)),
+      weeklyTasks: JSON.parse(JSON.stringify(presetCharacterWeeklyTasks)),
     },
+  }
+}
+
+function getDefaultAccountTasks() {
+  return {
+    dailyTasks: JSON.parse(JSON.stringify(presetAccountDailyTasks)),
+    weeklyTasks: JSON.parse(JSON.stringify(presetAccountWeeklyTasks)),
   }
 }
 
@@ -127,6 +151,16 @@ function normalizeCharacterTasks(chars, rawTasks) {
   return next
 }
 
+function normalizeAccountTasks(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { dailyTasks: [], weeklyTasks: [] }
+  }
+  return {
+    dailyTasks: Array.isArray(raw.dailyTasks) ? raw.dailyTasks : [],
+    weeklyTasks: Array.isArray(raw.weeklyTasks) ? raw.weeklyTasks : [],
+  }
+}
+
 function resolveActiveCharId(chars, rawActiveId) {
   if (typeof rawActiveId === 'string' && chars.some((c) => c.id === rawActiveId)) {
     return rawActiveId
@@ -149,6 +183,7 @@ function saveData() {
     activeCharId: activeCharId.value,
     characters: characters.value,
     characterTasks: characterTasks.value,
+    accountTasks: accountTasks.value,
   }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
@@ -165,6 +200,7 @@ function ensureActiveCharacter() {
   if (characters.value.length === 0) {
     characters.value = getDefaultCharacters()
     characterTasks.value = getDefaultCharacterTasks()
+    accountTasks.value = getDefaultAccountTasks()
   }
   activeCharId.value = resolveActiveCharId(characters.value, activeCharId.value)
   if (!characterTasks.value[activeCharId.value]) {
@@ -176,6 +212,7 @@ function resetToDefaults(todayKey, currentWeekKey) {
   characters.value = getDefaultCharacters()
   activeCharId.value = characters.value[0].id
   characterTasks.value = getDefaultCharacterTasks()
+  accountTasks.value = getDefaultAccountTasks()
   lastDate.value = todayKey
   lastWeekKey.value = currentWeekKey
   saveData()
@@ -212,6 +249,7 @@ function loadData() {
   characters.value = normalizedChars
   activeCharId.value = resolveActiveCharId(normalizedChars, parsed.activeCharId)
   characterTasks.value = normalizeCharacterTasks(normalizedChars, parsed.characterTasks)
+  accountTasks.value = normalizeAccountTasks(parsed.accountTasks)
   ensureActiveCharacter()
 
   const needResetDaily = parsed.lastDate !== todayKey
@@ -226,6 +264,13 @@ function loadData() {
       charData.weeklyTasks.forEach(resetTaskProgress)
     }
   })
+
+  if (needResetDaily && accountTasks.value.dailyTasks) {
+    accountTasks.value.dailyTasks.forEach(resetTaskProgress)
+  }
+  if (needResetWeekly && accountTasks.value.weeklyTasks) {
+    accountTasks.value.weeklyTasks.forEach(resetTaskProgress)
+  }
 
   lastDate.value = todayKey
   lastWeekKey.value = currentWeekKey
@@ -296,54 +341,70 @@ const currentCharacterName = computed(() => {
 })
 
 const currentDailyTasks = computed(() => {
-  if (!characterTasks.value[activeCharId.value]) return []
-  return characterTasks.value[activeCharId.value].dailyTasks || []
+  const account = accountTasks.value.dailyTasks || []
+  const character = characterTasks.value[activeCharId.value]?.dailyTasks || []
+  return [...account, ...character]
 })
 
 const currentWeeklyTasks = computed(() => {
-  if (!characterTasks.value[activeCharId.value]) return []
-  return characterTasks.value[activeCharId.value].weeklyTasks || []
+  const account = accountTasks.value.weeklyTasks || []
+  const character = characterTasks.value[activeCharId.value]?.weeklyTasks || []
+  return [...account, ...character]
 })
+
+function buildProgressStats(dailyList, weeklyList) {
+  const dDone = dailyList.filter((t) => t.done).length
+  const wDone = weeklyList.filter((t) => t.done).length
+  return {
+    dailyDone: dDone,
+    dailyTotal: dailyList.length,
+    dailyPercent: dailyList.length === 0 ? 0 : Math.round((dDone / dailyList.length) * 100),
+    weeklyDone: wDone,
+    weeklyTotal: weeklyList.length,
+    weeklyPercent: weeklyList.length === 0 ? 0 : Math.round((wDone / weeklyList.length) * 100),
+  }
+}
 
 const characterProgressOverview = computed(() => {
   return characters.value.map((char) => {
     const charData = characterTasks.value[char.id] || { dailyTasks: [], weeklyTasks: [] }
-    const dTasks = charData.dailyTasks || []
-    const wTasks = charData.weeklyTasks || []
-
-    const dDone = dTasks.filter((t) => t.done).length
-    const wDone = wTasks.filter((t) => t.done).length
-
-    const dPercent = dTasks.length === 0 ? 0 : Math.round((dDone / dTasks.length) * 100)
-    const wPercent = wTasks.length === 0 ? 0 : Math.round((wDone / wTasks.length) * 100)
-
     return {
       id: char.id,
       name: char.name,
-      dailyDone: dDone,
-      dailyTotal: dTasks.length,
-      dailyPercent: dPercent,
-      weeklyDone: wDone,
-      weeklyTotal: wTasks.length,
-      weeklyPercent: wPercent,
+      ...buildProgressStats(charData.dailyTasks || [], charData.weeklyTasks || []),
     }
   })
 })
 
+const accountProgressOverview = computed(() => {
+  return buildProgressStats(
+    accountTasks.value.dailyTasks || [],
+    accountTasks.value.weeklyTasks || [],
+  )
+})
+
 const filteredDailyTasks = computed(() => {
-  let list = currentDailyTasks.value
+  const account = accountTasks.value.dailyTasks || []
+  const character = characterTasks.value[activeCharId.value]?.dailyTasks || []
+  let accountList = account
+  let characterList = character
   if (dailyFilter.value !== 'all') {
-    list = list.filter((t) => t.category === dailyFilter.value)
+    accountList = accountList.filter((t) => t.category === dailyFilter.value)
+    characterList = characterList.filter((t) => t.category === dailyFilter.value)
   }
-  return sortTasks(list)
+  return [...sortTasks(accountList), ...sortTasks(characterList)]
 })
 
 const filteredWeeklyTasks = computed(() => {
-  let list = currentWeeklyTasks.value
+  const account = accountTasks.value.weeklyTasks || []
+  const character = characterTasks.value[activeCharId.value]?.weeklyTasks || []
+  let accountList = account
+  let characterList = character
   if (weeklyFilter.value !== 'all') {
-    list = list.filter((t) => t.category === weeklyFilter.value)
+    accountList = accountList.filter((t) => t.category === weeklyFilter.value)
+    characterList = characterList.filter((t) => t.category === weeklyFilter.value)
   }
-  return sortTasks(list)
+  return [...sortTasks(accountList), ...sortTasks(characterList)]
 })
 
 const dailyDoneCount = computed(() => currentDailyTasks.value.filter((t) => t.done).length)
@@ -380,8 +441,8 @@ function addNewCharacter() {
   characters.value.push({ id: newId, name: name.trim() })
 
   characterTasks.value[newId] = {
-    dailyTasks: JSON.parse(JSON.stringify(presetDailyTasks)),
-    weeklyTasks: JSON.parse(JSON.stringify(presetWeeklyTasks)),
+    dailyTasks: JSON.parse(JSON.stringify(presetCharacterDailyTasks)),
+    weeklyTasks: JSON.parse(JSON.stringify(presetCharacterWeeklyTasks)),
   }
 
   activeCharId.value = newId
@@ -478,6 +539,7 @@ function addTask() {
   if (!editMode.value) return
   if (!newTaskTitle.value.trim()) return
 
+  const isAccount = newTaskScope.value === 'account'
   const newTask = {
     id: Date.now().toString(),
     title: newTaskTitle.value.trim(),
@@ -486,19 +548,31 @@ function addTask() {
     category: newTaskCategory.value,
   }
 
+  if (isAccount) {
+    newTask.scope = 'account'
+  }
+
   if (hasCountLimit.value) {
     const max = Math.min(99, Math.max(1, Number(maxCountInput.value) || 1))
     newTask.maxCount = max
     newTask.currentCount = 0
   }
 
-  const currentTasks = characterTasks.value[activeCharId.value]
-  if (!currentTasks) return
-
-  if (newTaskType.value === 'daily') {
-    currentTasks.dailyTasks.push(newTask)
+  if (isAccount) {
+    if (newTaskType.value === 'daily') {
+      accountTasks.value.dailyTasks.push(newTask)
+    } else {
+      accountTasks.value.weeklyTasks.push(newTask)
+    }
   } else {
-    currentTasks.weeklyTasks.push(newTask)
+    const currentTasks = characterTasks.value[activeCharId.value]
+    if (!currentTasks) return
+
+    if (newTaskType.value === 'daily') {
+      currentTasks.dailyTasks.push(newTask)
+    } else {
+      currentTasks.weeklyTasks.push(newTask)
+    }
   }
 
   newTaskTitle.value = ''
@@ -513,19 +587,43 @@ function loadPresetTemplates() {
   const currentTasks = characterTasks.value[activeCharId.value]
   if (!currentTasks) return
 
-  if (currentTasks.dailyTasks.length > 0 || currentTasks.weeklyTasks.length > 0) {
-    if (!confirm(`恢復預設會將常態任務補充至【${currentCharacterName.value}】的清單中，是否繼續？`)) return
+  const hasAny =
+    currentTasks.dailyTasks.length > 0 ||
+    currentTasks.weeklyTasks.length > 0 ||
+    accountTasks.value.dailyTasks.length > 0 ||
+    accountTasks.value.weeklyTasks.length > 0
+
+  if (hasAny) {
+    if (
+      !confirm(
+        `恢復預設會將常態任務補充至【${currentCharacterName.value}】與帳號共用清單中，是否繼續？`,
+      )
+    ) {
+      return
+    }
   }
 
-  presetDailyTasks.forEach((pt) => {
+  presetCharacterDailyTasks.forEach((pt) => {
     if (!currentTasks.dailyTasks.some((t) => t.title === pt.title)) {
       currentTasks.dailyTasks.push(JSON.parse(JSON.stringify(pt)))
     }
   })
 
-  presetWeeklyTasks.forEach((pt) => {
+  presetCharacterWeeklyTasks.forEach((pt) => {
     if (!currentTasks.weeklyTasks.some((t) => t.title === pt.title)) {
       currentTasks.weeklyTasks.push(JSON.parse(JSON.stringify(pt)))
+    }
+  })
+
+  presetAccountDailyTasks.forEach((pt) => {
+    if (!accountTasks.value.dailyTasks.some((t) => t.title === pt.title)) {
+      accountTasks.value.dailyTasks.push(JSON.parse(JSON.stringify(pt)))
+    }
+  })
+
+  presetAccountWeeklyTasks.forEach((pt) => {
+    if (!accountTasks.value.weeklyTasks.some((t) => t.title === pt.title)) {
+      accountTasks.value.weeklyTasks.push(JSON.parse(JSON.stringify(pt)))
     }
   })
 
@@ -534,6 +632,17 @@ function loadPresetTemplates() {
 
 function deleteTask(type, id) {
   if (!editMode.value) return
+
+  const accountList = type === 'daily' ? accountTasks.value.dailyTasks : accountTasks.value.weeklyTasks
+  if (accountList.some((task) => task.id === id)) {
+    if (type === 'daily') {
+      accountTasks.value.dailyTasks = accountTasks.value.dailyTasks.filter((task) => task.id !== id)
+    } else {
+      accountTasks.value.weeklyTasks = accountTasks.value.weeklyTasks.filter((task) => task.id !== id)
+    }
+    saveData()
+    return
+  }
 
   const currentTasks = characterTasks.value[activeCharId.value]
   if (!currentTasks) return
@@ -573,6 +682,7 @@ function getExportText() {
     activeCharId: activeCharId.value,
     characters: characters.value,
     characterTasks: characterTasks.value,
+    accountTasks: accountTasks.value,
   }
   return JSON.stringify(data, null, 2)
 }
@@ -591,6 +701,7 @@ function importFromText(raw) {
     characters.value = normalizedChars
     activeCharId.value = resolveActiveCharId(normalizedChars, parsed.activeCharId)
     characterTasks.value = normalizeCharacterTasks(normalizedChars, parsed.characterTasks)
+    accountTasks.value = normalizeAccountTasks(parsed.accountTasks)
     ensureActiveCharacter()
     saveData()
     alert('🎉 包含所有角色的任務備份匯入成功！')
@@ -638,6 +749,7 @@ export function useTaskManager() {
     filteredDailyTasks,
     filteredWeeklyTasks,
     characterProgressOverview,
+    accountProgressOverview,
     dailyFilter,
     weeklyFilter,
     lastDate,
@@ -645,6 +757,7 @@ export function useTaskManager() {
     newTaskTitle,
     newTaskType,
     newTaskCategory,
+    newTaskScope,
     newTaskPinned,
     hasCountLimit,
     maxCountInput,
