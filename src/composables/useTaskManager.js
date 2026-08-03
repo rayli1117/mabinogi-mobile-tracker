@@ -27,8 +27,19 @@ const presetCharacterWeeklyTasks = [
   { id: 'p_cw4', title: '野外首領', done: false, category: 'dungeon' },
   { id: 'p_cw5', title: '深淵', done: false, category: 'dungeon', currentCount: 0, maxCount: 3 },
   { id: 'p_cw6', title: '不祥的召喚結界', done: false, category: 'dungeon', currentCount: 0, maxCount: 7 },
-  { id: 'p_cw7', title: '黑色坑洞', done: false, category: 'dungeon', currentCount: 0, maxCount: 14 },
+  {
+    id: 'p_cw7',
+    title: '黑色坑洞',
+    done: false,
+    category: 'dungeon',
+    currentCount: 0,
+    maxCount: 14,
+    rampingWeekly: { base: 7, perDay: 1 },
+  },
 ]
+
+const BLACK_HOLE_TASK_ID = 'p_cw7'
+const BLACK_HOLE_RAMPING = { base: 7, perDay: 1 }
 
 const presetAccountWeeklyTasks = [
   { id: 'p_aw1', title: '每週愛心幣聖水', done: false, category: 'shop', scope: 'account', currentCount: 0, maxCount: 20 },
@@ -64,6 +75,19 @@ const weeklyCountdownText = ref('0天 00:00:00')
 let timer = null
 let initialized = false
 
+function resolveRampingWeekly(task) {
+  if (task?.rampingWeekly && typeof task.rampingWeekly === 'object') {
+    return {
+      base: Number(task.rampingWeekly.base) || 0,
+      perDay: Number(task.rampingWeekly.perDay) || 0,
+    }
+  }
+  if (task?.id === BLACK_HOLE_TASK_ID) {
+    return { ...BLACK_HOLE_RAMPING }
+  }
+  return null
+}
+
 function toTaskDef(task) {
   const def = {
     id: task.id,
@@ -71,7 +95,29 @@ function toTaskDef(task) {
     category: task.category || 'other',
   }
   if (task.maxCount) def.maxCount = task.maxCount
+  const ramp = resolveRampingWeekly(task)
+  if (ramp) def.rampingWeekly = ramp
   return def
+}
+
+function getGameAdjustedDate(date = new Date()) {
+  const d = new Date(date)
+  if (d.getHours() < 6) d.setDate(d.getDate() - 1)
+  return d
+}
+
+/** Mon=1 … Sun=7, using the app's 06:00 day boundary. */
+function getMondayBasedDayIndex(date = new Date()) {
+  const day = getGameAdjustedDate(date).getDay()
+  return day === 0 ? 7 : day
+}
+
+function getEffectiveMaxCount(def, date = new Date()) {
+  if (!def?.maxCount) return undefined
+  const ramp = resolveRampingWeekly(def)
+  if (!ramp) return def.maxCount
+  const dayIndex = getMondayBasedDayIndex(date)
+  return Math.min(def.maxCount, ramp.base + ramp.perDay * dayIndex)
 }
 
 function toAccountTaskDef(task) {
@@ -200,10 +246,31 @@ function clampCount(value, maxCount) {
   return Math.min(maxCount, Math.max(0, Math.floor(n)))
 }
 
+function createProgressEntryFromRaw(raw, maxCount) {
+  if (!maxCount) {
+    return { done: !!(raw && raw.done) }
+  }
+  let currentCount = clampCount(raw?.currentCount, maxCount)
+  // Prefer stored currentCount; only treat bare done as "full" for legacy entries.
+  if (raw?.done && (raw?.currentCount == null || !Number.isFinite(Number(raw.currentCount)))) {
+    currentCount = maxCount
+  }
+  return {
+    currentCount,
+    done: currentCount >= maxCount,
+  }
+}
+
 function hydrateAccountTask(def, raw) {
-  const task = { ...def, done: !!(raw && raw.done) }
+  const task = { ...def }
   if (def.maxCount) {
-    task.currentCount = clampCount(raw?.currentCount, def.maxCount)
+    const effectiveMax = getEffectiveMaxCount(def)
+    const progress = createProgressEntryFromRaw(raw, effectiveMax)
+    task.currentCount = progress.currentCount
+    task.done = progress.done
+    task.maxCount = effectiveMax
+  } else {
+    task.done = !!(raw && raw.done)
   }
   return task
 }
@@ -284,10 +351,9 @@ function normalizeProgressMap(rawMap, defs) {
   const next = {}
   for (const def of defs) {
     const raw = source[def.id]
+    const effectiveMax = getEffectiveMaxCount(def)
     if (raw && typeof raw === 'object') {
-      const entry = { done: !!raw.done }
-      if (def.maxCount) entry.currentCount = Number(raw.currentCount) || 0
-      next[def.id] = entry
+      next[def.id] = createProgressEntryFromRaw(raw, effectiveMax)
     } else {
       next[def.id] = createEmptyProgressEntry(def.maxCount)
     }
@@ -317,11 +383,9 @@ function appendDefsFromLegacyList(list, defs, idSet) {
   }
 }
 
-function progressFromLegacyTask(task, maxCount) {
-  if (!task) return createEmptyProgressEntry(maxCount)
-  const entry = { done: !!task.done }
-  if (maxCount) entry.currentCount = Number(task.currentCount) || 0
-  return entry
+function progressFromLegacyTask(task, def) {
+  if (!task) return createEmptyProgressEntry(def?.maxCount)
+  return createProgressEntryFromRaw(task, getEffectiveMaxCount(def) || def?.maxCount)
 }
 
 function migrateFromLegacyCharacterTasks(chars, activeId, rawCharacterTasks) {
@@ -359,11 +423,11 @@ function migrateFromLegacyCharacterTasks(chars, activeId, rawCharacterTasks) {
 
     const daily = {}
     for (const def of dailyDefs) {
-      daily[def.id] = progressFromLegacyTask(dailyById[def.id], def.maxCount)
+      daily[def.id] = progressFromLegacyTask(dailyById[def.id], def)
     }
     const weekly = {}
     for (const def of weeklyDefs) {
-      weekly[def.id] = progressFromLegacyTask(weeklyById[def.id], def.maxCount)
+      weekly[def.id] = progressFromLegacyTask(weeklyById[def.id], def)
     }
     progress[char.id] = { daily, weekly }
   }
@@ -476,16 +540,25 @@ function getOrCreateProgressEntry(charId, period, taskId, maxCount) {
 
 function mergeDefsWithProgress(defs, progressMap) {
   return (defs || []).map((def) => {
-    const prog = progressMap?.[def.id] || createEmptyProgressEntry(def.maxCount)
+    const effectiveMax = getEffectiveMaxCount(def)
+    const prog = createProgressEntryFromRaw(
+      progressMap?.[def.id] || createEmptyProgressEntry(def.maxCount),
+      effectiveMax,
+    )
     const merged = {
       id: def.id,
       title: def.title,
       category: def.category,
-      done: !!prog.done,
+      done: prog.done,
     }
     if (def.maxCount) {
-      merged.maxCount = def.maxCount
-      merged.currentCount = Number(prog.currentCount) || 0
+      merged.maxCount = effectiveMax
+      merged.currentCount = prog.currentCount
+    }
+    const ramp = resolveRampingWeekly(def)
+    if (ramp) {
+      merged.rampingWeekly = ramp
+      merged.weeklyMaxCount = def.maxCount
     }
     return merged
   })
@@ -499,12 +572,29 @@ function getCharacterMergedTasks(charId) {
   }
 }
 
+function refreshRampingWeeklyProgress() {
+  for (const def of sharedCharacterTasks.value.weeklyTasks || []) {
+    if (!resolveRampingWeekly(def) || !def.maxCount) continue
+    const effectiveMax = getEffectiveMaxCount(def)
+    for (const char of characters.value) {
+      const bucket = ensureCharProgress(char.id)
+      const entry = bucket.weekly[def.id]
+      if (!entry) {
+        bucket.weekly[def.id] = createEmptyProgressEntry(def.maxCount)
+      } else {
+        bucket.weekly[def.id] = createProgressEntryFromRaw(entry, effectiveMax)
+      }
+    }
+  }
+}
+
 function applyPeriodResets(needDaily, needWeekly) {
   if (needDaily) {
     resetAllCharacterPeriodProgress('daily')
     if (accountTasks.value.dailyTasks) {
       accountTasks.value.dailyTasks.forEach(resetTaskProgress)
     }
+    refreshRampingWeeklyProgress()
   }
   if (needWeekly) {
     resetAllCharacterPeriodProgress('weekly')
@@ -881,7 +971,8 @@ function toggleTask(task) {
   if (task.scope === 'account') {
     task.done = !task.done
     if (task.maxCount) {
-      task.currentCount = task.done ? task.maxCount : 0
+      const effectiveMax = getEffectiveMaxCount(task)
+      task.currentCount = task.done ? effectiveMax : 0
     }
     saveData()
     return
@@ -890,6 +981,7 @@ function toggleTask(task) {
   const found = findSharedTaskDef(task.id)
   if (!found?.def) return
 
+  const effectiveMax = getEffectiveMaxCount(found.def)
   const prog = getOrCreateProgressEntry(
     activeCharId.value,
     found.period,
@@ -898,7 +990,7 @@ function toggleTask(task) {
   )
   prog.done = !prog.done
   if (found.def.maxCount) {
-    prog.currentCount = prog.done ? found.def.maxCount : 0
+    prog.currentCount = prog.done ? effectiveMax : 0
   }
   saveData()
 }
@@ -926,9 +1018,10 @@ function incrementCount(task) {
   if (!task?.maxCount) return
 
   if (task.scope === 'account') {
-    if ((task.currentCount || 0) < task.maxCount) {
+    const effectiveMax = getEffectiveMaxCount(task)
+    if ((task.currentCount || 0) < effectiveMax) {
       task.currentCount = (task.currentCount || 0) + 1
-      if (task.currentCount === task.maxCount) {
+      if (task.currentCount === effectiveMax) {
         task.done = true
       }
       saveData()
@@ -939,15 +1032,16 @@ function incrementCount(task) {
   const found = findSharedTaskDef(task.id)
   if (!found?.def?.maxCount) return
 
+  const effectiveMax = getEffectiveMaxCount(found.def)
   const prog = getOrCreateProgressEntry(
     activeCharId.value,
     found.period,
     task.id,
     found.def.maxCount,
   )
-  if ((prog.currentCount || 0) < found.def.maxCount) {
+  if ((prog.currentCount || 0) < effectiveMax) {
     prog.currentCount = (prog.currentCount || 0) + 1
-    if (prog.currentCount === found.def.maxCount) {
+    if (prog.currentCount === effectiveMax) {
       prog.done = true
     }
     saveData()
@@ -958,9 +1052,10 @@ function decrementCount(task) {
   if (!task?.maxCount) return
 
   if (task.scope === 'account') {
+    const effectiveMax = getEffectiveMaxCount(task)
     if ((task.currentCount || 0) > 0) {
       task.currentCount = task.currentCount - 1
-      if (task.currentCount < task.maxCount) {
+      if (task.currentCount < effectiveMax) {
         task.done = false
       }
       saveData()
@@ -971,6 +1066,7 @@ function decrementCount(task) {
   const found = findSharedTaskDef(task.id)
   if (!found?.def?.maxCount) return
 
+  const effectiveMax = getEffectiveMaxCount(found.def)
   const prog = getOrCreateProgressEntry(
     activeCharId.value,
     found.period,
@@ -979,7 +1075,7 @@ function decrementCount(task) {
   )
   if ((prog.currentCount || 0) > 0) {
     prog.currentCount = prog.currentCount - 1
-    if (prog.currentCount < found.def.maxCount) {
+    if (prog.currentCount < effectiveMax) {
       prog.done = false
     }
     saveData()
@@ -1044,6 +1140,27 @@ function addTask() {
 
   newTaskTitle.value = ''
   hasCountLimit.value = false
+  saveData()
+}
+
+function addBlackHoleTask() {
+  if (!editMode.value) return
+
+  const weekly = sharedCharacterTasks.value.weeklyTasks || []
+  const exists = weekly.some(
+    (task) => task.id === BLACK_HOLE_TASK_ID || task.title === '黑色坑洞',
+  )
+  if (exists) {
+    alert('⚠️ 黑色坑洞任務已存在。')
+    return
+  }
+
+  const preset = presetCharacterWeeklyTasks.find((t) => t.id === BLACK_HOLE_TASK_ID)
+  if (!preset) return
+
+  const def = toTaskDef(preset)
+  sharedCharacterTasks.value.weeklyTasks.push(def)
+  initProgressForTaskOnAllCharacters(def.id, 'weekly', def.maxCount)
   saveData()
 }
 
@@ -1267,6 +1384,7 @@ export function useTaskManager() {
     incrementCount,
     decrementCount,
     addTask,
+    addBlackHoleTask,
     loadPresetTemplates,
     deleteTask,
     resetDaily,

@@ -123,8 +123,18 @@ function onRowClick() {
         <span
           class="text-xs font-mono px-1.5 font-semibold"
           :class="task.done ? 'text-slate-500' : type === 'daily' ? 'text-amber-400' : 'text-sky-400'"
+          :title="
+            task.weeklyMaxCount
+              ? `今日可用 ${task.maxCount}／每週上限 ${task.weeklyMaxCount}`
+              : undefined
+          "
         >
-          {{ task.currentCount || 0 }}/{{ task.maxCount }}
+          <template v-if="task.weeklyMaxCount">
+            {{ task.currentCount || 0 }}/{{ task.maxCount }} ({{ task.weeklyMaxCount }})
+          </template>
+          <template v-else>
+            {{ task.currentCount || 0 }}/{{ task.maxCount }}
+          </template>
         </span>
         <button
           @click.stop="incrementCount(task)"

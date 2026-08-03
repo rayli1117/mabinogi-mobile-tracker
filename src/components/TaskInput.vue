@@ -11,6 +11,7 @@ const {
   hasCountLimit,
   maxCountInput,
   addTask,
+  addBlackHoleTask,
 } = useTaskManager()
 </script>
 
@@ -58,6 +59,18 @@ const {
           <option value="daily">📅 每日任務</option>
           <option value="weekly">🗓️ 每週任務</option>
         </select>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[11px] text-slate-500">快速新增:</span>
+        <button
+          type="button"
+          @click="addBlackHoleTask"
+          class="text-xs px-2.5 py-1 rounded-lg border border-slate-600 bg-slate-900 text-slate-300 hover:border-sky-500/60 hover:text-sky-300 transition"
+          title="角色／每週／副本討伐，遞增次數上限 14"
+        >
+          ⚔️ 黑色坑洞
+        </button>
       </div>
 
       <div class="flex flex-wrap items-center justify-between bg-slate-900/60 p-2 rounded-lg border border-slate-700/60 text-xs gap-2">
