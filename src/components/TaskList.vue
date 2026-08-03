@@ -57,7 +57,7 @@ const progressBarClass = computed(() => {
 </script>
 
 <template>
-  <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+  <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
     <div class="flex items-center justify-between mb-2">
       <h2 class="text-lg font-semibold flex items-center gap-2" :class="titleClass">
         <span>{{ titleText }}</span>

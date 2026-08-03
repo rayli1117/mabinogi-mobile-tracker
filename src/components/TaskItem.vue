@@ -1,4 +1,5 @@
 <script setup>
+import { ref, nextTick, watch } from 'vue'
 import { useTaskManager } from '../composables/useTaskManager'
 
 const props = defineProps({
@@ -14,13 +15,50 @@ const props = defineProps({
 })
 
 const {
+  editMode,
   getCategoryInfo,
   toggleTask,
   togglePin,
+  updateTask,
   incrementCount,
   decrementCount,
   deleteTask,
 } = useTaskManager()
+
+const isEditingTitle = ref(false)
+const editTitle = ref('')
+const titleInput = ref(null)
+
+watch(editMode, (on) => {
+  if (!on) {
+    isEditingTitle.value = false
+  }
+})
+
+async function startEditTitle() {
+  if (!editMode.value) return
+  editTitle.value = props.task.title
+  isEditingTitle.value = true
+  await nextTick()
+  titleInput.value?.focus()
+  titleInput.value?.select()
+}
+
+function saveTitle() {
+  if (!isEditingTitle.value) return
+  updateTask(props.task, { title: editTitle.value })
+  isEditingTitle.value = false
+}
+
+function cancelEditTitle() {
+  isEditingTitle.value = false
+  editTitle.value = props.task.title
+}
+
+function onRowClick() {
+  if (editMode.value) return
+  toggleTask(props.task)
+}
 </script>
 
 <template>
@@ -35,10 +73,35 @@ const {
         : '',
     ]"
   >
-    <div class="flex-1 flex items-center gap-3 cursor-pointer overflow-hidden" @click="toggleTask(task)">
+    <div
+      class="flex-1 flex items-center gap-3 overflow-hidden"
+      :class="editMode ? '' : 'cursor-pointer'"
+      @click="onRowClick"
+    >
       <span class="text-lg transition-transform active:scale-125 shrink-0">{{ task.done ? '✅' : '⬜' }}</span>
       <span v-if="task.pinned" class="text-xs shrink-0" title="重點釘選">📌</span>
-      <span class="truncate" :class="{ 'line-through': task.done }">{{ task.title }}</span>
+
+      <input
+        v-if="isEditingTitle"
+        ref="titleInput"
+        v-model="editTitle"
+        type="text"
+        class="flex-1 min-w-0 bg-slate-900 border border-amber-500/60 rounded px-2 py-0.5 text-sm text-slate-100 focus:outline-none"
+        @click.stop
+        @keydown.enter.prevent="saveTitle"
+        @keydown.escape.prevent="cancelEditTitle"
+        @blur="saveTitle"
+      />
+      <span
+        v-else
+        class="truncate"
+        :class="{ 'line-through': task.done, 'cursor-text': editMode }"
+        :title="editMode ? '點擊重新命名' : undefined"
+        @click.stop="editMode ? startEditTitle() : null"
+      >
+        {{ task.title }}
+      </span>
+
       <span class="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700/70 text-slate-400 font-normal shrink-0 hidden sm:inline-block">
         {{ getCategoryInfo(task.category).icon }} {{ getCategoryInfo(task.category).name }}
       </span>
@@ -71,28 +134,38 @@ const {
         </button>
       </div>
 
-      <button
-        @click.stop="togglePin(task)"
-        class="p-1 text-xs rounded transition"
-        :class="
-          task.pinned
-            ? type === 'daily'
-              ? 'text-amber-400 font-bold'
-              : 'text-sky-400 font-bold'
-            : 'text-slate-500 hover:text-slate-300 opacity-60 sm:opacity-0 sm:group-hover:opacity-100'
-        "
-        :title="task.pinned ? '取消釘選' : '釘選置頂'"
-      >
-        {{ task.pinned ? '📌' : '📍' }}
-      </button>
+      <template v-if="editMode">
+        <button
+          @click.stop="startEditTitle"
+          class="p-1 text-xs rounded transition text-slate-500 hover:text-slate-200 opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+          title="重新命名任務"
+        >
+          ✎
+        </button>
 
-      <button
-        @click.stop="deleteTask(type, task.id)"
-        class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
-        title="刪除任務"
-      >
-        🗑️
-      </button>
+        <button
+          @click.stop="togglePin(task)"
+          class="p-1 text-xs rounded transition"
+          :class="
+            task.pinned
+              ? type === 'daily'
+                ? 'text-amber-400 font-bold'
+                : 'text-sky-400 font-bold'
+              : 'text-slate-500 hover:text-slate-300 opacity-60 sm:opacity-0 sm:group-hover:opacity-100'
+          "
+          :title="task.pinned ? '取消釘選' : '釘選置頂'"
+        >
+          {{ task.pinned ? '📌' : '📍' }}
+        </button>
+
+        <button
+          @click.stop="deleteTask(type, task.id)"
+          class="text-slate-500 hover:text-rose-400 p-1 text-sm rounded transition opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+          title="刪除任務"
+        >
+          🗑️
+        </button>
+      </template>
     </div>
   </li>
 </template>

@@ -27,6 +27,7 @@ const presetWeeklyTasks = [
 const characters = ref([{ id: 'char_1', name: '主要角色' }])
 const activeCharId = ref('char_1')
 const showDashboard = ref(false)
+const editMode = ref(false)
 const characterTasks = ref({
   char_1: {
     dailyTasks: JSON.parse(JSON.stringify(presetDailyTasks)),
@@ -370,6 +371,8 @@ function switchCharacterFromDashboard(charId) {
 }
 
 function addNewCharacter() {
+  if (!editMode.value) return
+
   const name = prompt('請輸入新角色/分身名稱：', `分身 ${characters.value.length + 1}`)
   if (!name || !name.trim()) return
 
@@ -386,6 +389,8 @@ function addNewCharacter() {
 }
 
 function deleteCurrentCharacter() {
+  if (!editMode.value) return
+
   if (characters.value.length <= 1) {
     alert('⚠️ 至少需要保留一個角色！')
     return
@@ -400,6 +405,27 @@ function deleteCurrentCharacter() {
   }
 }
 
+function renameCharacter(charId, newName) {
+  if (!editMode.value) return
+
+  const trimmed = typeof newName === 'string' ? newName.trim() : ''
+  if (!trimmed) return
+
+  const char = characters.value.find((c) => c.id === charId)
+  if (!char) return
+
+  char.name = trimmed
+  saveData()
+}
+
+function renameCurrentCharacter() {
+  if (!editMode.value) return
+
+  const name = prompt('請輸入角色名稱：', currentCharacterName.value)
+  if (name === null) return
+  renameCharacter(activeCharId.value, name)
+}
+
 function toggleTask(task) {
   task.done = !task.done
   if (task.maxCount) {
@@ -409,7 +435,20 @@ function toggleTask(task) {
 }
 
 function togglePin(task) {
+  if (!editMode.value) return
   task.pinned = !task.pinned
+  saveData()
+}
+
+function updateTask(task, patch) {
+  if (!editMode.value || !task || !patch) return
+
+  if (typeof patch.title === 'string') {
+    const trimmed = patch.title.trim()
+    if (!trimmed) return
+    task.title = trimmed
+  }
+
   saveData()
 }
 
@@ -436,6 +475,7 @@ function decrementCount(task) {
 }
 
 function addTask() {
+  if (!editMode.value) return
   if (!newTaskTitle.value.trim()) return
 
   const newTask = {
@@ -468,11 +508,13 @@ function addTask() {
 }
 
 function loadPresetTemplates() {
+  if (!editMode.value) return
+
   const currentTasks = characterTasks.value[activeCharId.value]
   if (!currentTasks) return
 
   if (currentTasks.dailyTasks.length > 0 || currentTasks.weeklyTasks.length > 0) {
-    if (!confirm(`載入範本會將常態任務補充至【${currentCharacterName.value}】的清單中，是否繼續？`)) return
+    if (!confirm(`恢復預設會將常態任務補充至【${currentCharacterName.value}】的清單中，是否繼續？`)) return
   }
 
   presetDailyTasks.forEach((pt) => {
@@ -491,6 +533,8 @@ function loadPresetTemplates() {
 }
 
 function deleteTask(type, id) {
+  if (!editMode.value) return
+
   const currentTasks = characterTasks.value[activeCharId.value]
   if (!currentTasks) return
 
@@ -542,10 +586,16 @@ function exportData() {
 }
 
 function triggerFileInput() {
+  if (!editMode.value) return
   if (fileInput.value) fileInput.value.click()
 }
 
 function importData(event) {
+  if (!editMode.value) {
+    event.target.value = ''
+    return
+  }
+
   const file = event.target.files[0]
   if (!file) return
 
@@ -604,6 +654,7 @@ export function useTaskManager() {
     characters,
     activeCharId,
     showDashboard,
+    editMode,
     currentCharacterName,
     currentDailyTasks,
     currentWeeklyTasks,
@@ -632,8 +683,11 @@ export function useTaskManager() {
     switchCharacterFromDashboard,
     addNewCharacter,
     deleteCurrentCharacter,
+    renameCharacter,
+    renameCurrentCharacter,
     toggleTask,
     togglePin,
+    updateTask,
     incrementCount,
     decrementCount,
     addTask,

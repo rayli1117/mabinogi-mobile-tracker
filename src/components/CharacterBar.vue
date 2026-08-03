@@ -4,15 +4,17 @@ import { useTaskManager } from '../composables/useTaskManager'
 const {
   characters,
   activeCharId,
+  editMode,
   switchCharacter,
   addNewCharacter,
   deleteCurrentCharacter,
+  renameCurrentCharacter,
 } = useTaskManager()
 </script>
 
 <template>
-  <section class="bg-slate-800/90 p-3 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-3 shadow-md">
-    <div class="flex items-center gap-2 overflow-x-auto py-1 scrollbar-none flex-1">
+  <section class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-700/70">
+    <div class="flex items-center gap-2 overflow-x-auto py-0.5 scrollbar-none flex-1 min-w-0">
       <span class="text-xs font-semibold text-slate-400 shrink-0">🎭 角色:</span>
       <button
         v-for="char in characters"
@@ -26,7 +28,14 @@ const {
       </button>
     </div>
 
-    <div class="flex items-center gap-2 shrink-0">
+    <div v-if="editMode" class="flex items-center gap-1.5 shrink-0">
+      <button
+        @click="renameCurrentCharacter"
+        class="px-2.5 py-1 bg-slate-900 hover:bg-slate-700 text-slate-200 text-xs rounded border border-slate-600 transition"
+        title="重新命名當前角色"
+      >
+        ✎ 重新命名
+      </button>
       <button
         @click="addNewCharacter"
         class="px-2.5 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 text-xs rounded border border-emerald-500/50 transition"

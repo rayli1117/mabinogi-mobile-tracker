@@ -5,25 +5,21 @@ const { dailyCountdownText, weeklyCountdownText } = useTaskManager()
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    <section class="bg-slate-800/80 border border-amber-500/30 p-3 rounded-xl shadow-md flex items-center justify-between">
-      <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
-        <span class="text-amber-400 text-base">⏳</span>
-        <span class="font-medium">距離每日重置 (06:00)：</span>
-      </div>
-      <div class="font-mono font-bold text-amber-400 text-xs sm:text-sm tracking-wider bg-slate-900 px-2.5 py-1 rounded border border-amber-500/20">
+  <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-700/70">
+    <div class="flex items-center gap-2 text-xs bg-slate-900/70 border border-amber-500/30 rounded-lg px-2.5 py-1.5 grow sm:grow-0">
+      <span class="text-amber-400 shrink-0">⏳</span>
+      <span class="text-slate-400 font-medium shrink-0">每日重置</span>
+      <span class="font-mono font-bold text-amber-400 tracking-wider ml-auto sm:ml-1">
         {{ dailyCountdownText }}
-      </div>
-    </section>
+      </span>
+    </div>
 
-    <section class="bg-slate-800/80 border border-sky-500/30 p-3 rounded-xl shadow-md flex items-center justify-between">
-      <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
-        <span class="text-sky-400 text-base">🗓️</span>
-        <span class="font-medium">距離每週重置 (週一 06:00)：</span>
-      </div>
-      <div class="font-mono font-bold text-sky-400 text-xs sm:text-sm tracking-wider bg-slate-900 px-2.5 py-1 rounded border border-sky-500/20">
+    <div class="flex items-center gap-2 text-xs bg-slate-900/70 border border-sky-500/30 rounded-lg px-2.5 py-1.5 grow sm:grow-0">
+      <span class="text-sky-400 shrink-0">🗓️</span>
+      <span class="text-slate-400 font-medium shrink-0">每週重置</span>
+      <span class="font-mono font-bold text-sky-400 tracking-wider ml-auto sm:ml-1">
         {{ weeklyCountdownText }}
-      </div>
-    </section>
+      </span>
+    </div>
   </div>
 </template>

@@ -4,6 +4,7 @@ import { useTaskManager } from '../composables/useTaskManager'
 const {
   categories,
   currentCharacterName,
+  editMode,
   newTaskTitle,
   newTaskCategory,
   newTaskType,
@@ -15,7 +16,10 @@ const {
 </script>
 
 <template>
-  <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg space-y-3">
+  <section
+    v-if="editMode"
+    class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg space-y-3"
+  >
     <h3 class="text-sm font-semibold text-slate-300">➕ 為【{{ currentCharacterName }}】新增任務</h3>
     <div class="flex flex-col gap-2">
       <div class="flex flex-col sm:flex-row gap-2">
