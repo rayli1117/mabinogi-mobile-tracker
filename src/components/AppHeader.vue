@@ -7,12 +7,9 @@ const {
   lastDate,
   lastWeekKey,
   showDashboard,
+  showImportExport,
   editMode,
   loadPresetTemplates,
-  exportData,
-  triggerFileInput,
-  importData,
-  fileInput,
   resetDaily,
   resetWeekly,
 } = useTaskManager()
@@ -56,25 +53,11 @@ const {
         </button>
 
         <button
-          @click="exportData"
+          @click="showImportExport = true"
           class="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 text-xs rounded border border-amber-500/50 transition"
         >
-          📤 匯出 JSON
+          📋 匯出/匯入
         </button>
-        <button
-          v-if="editMode"
-          @click="triggerFileInput"
-          class="px-2.5 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 text-xs rounded border border-amber-500/50 transition"
-        >
-          📥 匯入 JSON
-        </button>
-        <input
-          type="file"
-          ref="fileInput"
-          @change="importData"
-          accept=".json"
-          class="hidden"
-        />
 
         <button
           @click="resetDaily"

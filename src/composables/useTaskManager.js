@@ -27,6 +27,7 @@ const presetWeeklyTasks = [
 const characters = ref([{ id: 'char_1', name: '主要角色' }])
 const activeCharId = ref('char_1')
 const showDashboard = ref(false)
+const showImportExport = ref(false)
 const editMode = ref(false)
 const characterTasks = ref({
   char_1: {
@@ -45,7 +46,6 @@ const hasCountLimit = ref(false)
 const maxCountInput = ref(3)
 const dailyFilter = ref('all')
 const weeklyFilter = ref('all')
-const fileInput = ref(null)
 const dailyCountdownText = ref('00:00:00')
 const weeklyCountdownText = ref('0天 00:00:00')
 
@@ -566,7 +566,7 @@ function resetWeekly() {
   }
 }
 
-function exportData() {
+function getExportText() {
   const data = {
     lastDate: getCustomDateString(),
     lastWeekKey: getCustomWeekKey(),
@@ -574,55 +574,31 @@ function exportData() {
     characters: characters.value,
     characterTasks: characterTasks.value,
   }
-  const jsonStr = JSON.stringify(data, null, 2)
-  const blob = new Blob([jsonStr], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `mabinogi_tasks_multi_${getCustomDateString()}.json`
-  a.click()
-  URL.revokeObjectURL(url)
+  return JSON.stringify(data, null, 2)
 }
 
-function triggerFileInput() {
-  if (!editMode.value) return
-  if (fileInput.value) fileInput.value.click()
-}
-
-function importData(event) {
-  if (!editMode.value) {
-    event.target.value = ''
-    return
-  }
-
-  const file = event.target.files[0]
-  if (!file) return
-
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    try {
-      const parsed = JSON.parse(e.target.result)
-      if (!isValidImportPayload(parsed)) {
-        alert('⚠️ 檔案格式不符合多角色任務清單規格！')
-        return
-      }
-
-      if (!confirm('匯入會覆蓋目前所有角色與任務進度，確定要繼續嗎？')) return
-
-      const normalizedChars = normalizeCharacters(parsed.characters)
-      characters.value = normalizedChars
-      activeCharId.value = resolveActiveCharId(normalizedChars, parsed.activeCharId)
-      characterTasks.value = normalizeCharacterTasks(normalizedChars, parsed.characterTasks)
-      ensureActiveCharacter()
-      saveData()
-      alert('🎉 包含所有角色的任務備份匯入成功！')
-    } catch {
-      alert('❌ 解析 JSON 檔案失敗，請確認檔案格式是否正確。')
+function importFromText(raw) {
+  try {
+    const parsed = JSON.parse(raw)
+    if (!isValidImportPayload(parsed)) {
+      alert('⚠️ 文字格式不符合多角色任務清單規格！')
+      return false
     }
+
+    if (!confirm('匯入會覆蓋目前所有角色與任務進度，確定要繼續嗎？')) return false
+
+    const normalizedChars = normalizeCharacters(parsed.characters)
+    characters.value = normalizedChars
+    activeCharId.value = resolveActiveCharId(normalizedChars, parsed.activeCharId)
+    characterTasks.value = normalizeCharacterTasks(normalizedChars, parsed.characterTasks)
+    ensureActiveCharacter()
+    saveData()
+    alert('🎉 包含所有角色的任務備份匯入成功！')
+    return true
+  } catch {
+    alert('❌ 解析 JSON 文字失敗，請確認格式是否正確。')
+    return false
   }
-  reader.readAsText(file)
-  event.target.value = ''
 }
 
 function initTaskManager() {
@@ -654,6 +630,7 @@ export function useTaskManager() {
     characters,
     activeCharId,
     showDashboard,
+    showImportExport,
     editMode,
     currentCharacterName,
     currentDailyTasks,
@@ -671,7 +648,6 @@ export function useTaskManager() {
     newTaskPinned,
     hasCountLimit,
     maxCountInput,
-    fileInput,
     dailyCountdownText,
     weeklyCountdownText,
     dailyDoneCount,
@@ -695,8 +671,7 @@ export function useTaskManager() {
     deleteTask,
     resetDaily,
     resetWeekly,
-    exportData,
-    triggerFileInput,
-    importData,
+    getExportText,
+    importFromText,
   }
 }

@@ -4,6 +4,7 @@ import AppHeader from './components/AppHeader.vue'
 import TaskInput from './components/TaskInput.vue'
 import TaskList from './components/TaskList.vue'
 import ProgressDashboard from './components/ProgressDashboard.vue'
+import ImportExportDialog from './components/ImportExportDialog.vue'
 
 // Initialize shared state, localStorage sync, and countdown timers
 useTaskManager()
@@ -18,5 +19,6 @@ useTaskManager()
       <TaskList type="weekly" />
     </div>
     <ProgressDashboard />
+    <ImportExportDialog />
   </div>
 </template>
