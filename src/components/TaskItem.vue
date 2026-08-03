@@ -18,7 +18,6 @@ const {
   editMode,
   getCategoryInfo,
   toggleTask,
-  togglePin,
   updateTask,
   incrementCount,
   decrementCount,
@@ -64,14 +63,11 @@ function onRowClick() {
 <template>
   <li
     class="flex items-center justify-between p-3 rounded-lg border transition-all duration-300 select-none group"
-    :class="[
-      task.done ? 'bg-slate-900/50 border-slate-800/80 text-slate-500' : 'bg-slate-700/50 border-slate-600 hover:border-slate-500',
-      task.pinned && !task.done
-        ? type === 'daily'
-          ? 'ring-1 ring-amber-400/60 border-amber-500/50 bg-amber-950/20'
-          : 'ring-1 ring-sky-400/60 border-sky-500/50 bg-sky-950/20'
-        : '',
-    ]"
+    :class="
+      task.done
+        ? 'bg-slate-900/50 border-slate-800/80 text-slate-500'
+        : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'
+    "
   >
     <div
       class="flex-1 flex items-center gap-3 overflow-hidden"
@@ -79,7 +75,6 @@ function onRowClick() {
       @click="onRowClick"
     >
       <span class="text-lg transition-transform active:scale-125 shrink-0">{{ task.done ? '✅' : '⬜' }}</span>
-      <span v-if="task.pinned" class="text-xs shrink-0" title="重點釘選">📌</span>
 
       <input
         v-if="isEditingTitle"
@@ -97,7 +92,7 @@ function onRowClick() {
         class="truncate"
         :class="{ 'line-through': task.done, 'cursor-text': editMode }"
         :title="editMode ? '點擊重新命名' : undefined"
-        @click.stop="editMode ? startEditTitle() : null"
+        @click.stop="editMode ? startEditTitle() : onRowClick()"
       >
         {{ task.title }}
       </span>
@@ -147,21 +142,6 @@ function onRowClick() {
           title="重新命名任務"
         >
           ✎
-        </button>
-
-        <button
-          @click.stop="togglePin(task)"
-          class="p-1 text-xs rounded transition"
-          :class="
-            task.pinned
-              ? type === 'daily'
-                ? 'text-amber-400 font-bold'
-                : 'text-sky-400 font-bold'
-              : 'text-slate-500 hover:text-slate-300 opacity-60 sm:opacity-0 sm:group-hover:opacity-100'
-          "
-          :title="task.pinned ? '取消釘選' : '釘選置頂'"
-        >
-          {{ task.pinned ? '📌' : '📍' }}
         </button>
 
         <button

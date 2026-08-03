@@ -100,7 +100,7 @@ const progressBarClass = computed(() => {
     <transition-group name="task-list" tag="ul" class="space-y-3 relative">
       <TaskItem
         v-for="task in tasks"
-        :key="task.id"
+        :key="`${task.scope || 'character'}-${task.id}`"
         :task="task"
         :type="type"
       />

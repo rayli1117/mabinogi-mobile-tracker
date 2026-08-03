@@ -3,7 +3,6 @@ import { useTaskManager } from '../composables/useTaskManager'
 
 const {
   categories,
-  currentCharacterName,
   editMode,
   newTaskTitle,
   newTaskCategory,
@@ -11,7 +10,6 @@ const {
   newTaskScope,
   hasCountLimit,
   maxCountInput,
-  newTaskPinned,
   addTask,
 } = useTaskManager()
 </script>
@@ -26,7 +24,7 @@ const {
       {{
         newTaskScope === 'account'
           ? '為【帳號共用】新增任務'
-          : `為【${currentCharacterName}】新增任務`
+          : '為【所有角色】新增任務'
       }}
     </h3>
     <div class="flex flex-col gap-2">
@@ -83,15 +81,6 @@ const {
               class="w-14 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-center text-amber-400 font-mono text-xs focus:outline-none focus:border-amber-400"
             />
           </div>
-
-          <label class="flex items-center gap-1.5 cursor-pointer text-amber-300 select-none">
-            <input
-              type="checkbox"
-              v-model="newTaskPinned"
-              class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0"
-            />
-            <span>📌 置頂釘選</span>
-          </label>
         </div>
 
         <button
