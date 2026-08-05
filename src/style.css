@@ -13,6 +13,25 @@ body.overlay-mode .overlay-root {
   min-height: 100vh;
 }
 
+/* Frameless Tauri overlay: clear page chrome so transparent window shows through */
+html.overlay-tauri,
+body.overlay-tauri {
+  background: transparent !important;
+}
+
+body.overlay-tauri .overlay-root {
+  background: rgba(15, 23, 42, 0.92);
+  border-radius: 12px;
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+body.overlay-tauri .overlay-root.overlay-click-through {
+  outline: 2px dashed rgba(244, 63, 94, 0.55);
+  outline-offset: -2px;
+}
+
 /* Smooth slide when task list order changes */
 .task-list-move {
   transition: transform 0.4s ease;

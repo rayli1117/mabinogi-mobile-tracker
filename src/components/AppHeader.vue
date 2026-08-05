@@ -1,10 +1,8 @@
 <script setup>
-import { useRouter } from 'vue-router'
 import { useTaskManager } from '../composables/useTaskManager'
+import { openOverlayWindow } from '../composables/useOverlayWindow'
 import CharacterBar from './CharacterBar.vue'
 import CountdownTimer from './CountdownTimer.vue'
-
-const router = useRouter()
 
 const {
   lastDate,
@@ -16,11 +14,6 @@ const {
   resetDaily,
   resetWeekly,
 } = useTaskManager()
-
-function openOverlayWindow() {
-  const url = router.resolve({ name: 'overlay' }).href
-  window.open(url, 'mmt-overlay', 'width=360,height=640,resizable=yes,scrollbars=yes')
-}
 </script>
 
 <template>

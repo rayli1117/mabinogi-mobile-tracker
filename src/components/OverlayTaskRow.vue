@@ -11,6 +11,10 @@ defineProps({
     default: 'emerald',
     validator: (v) => ['emerald', 'sky'].includes(v),
   },
+  hotkeyIndex: {
+    type: Number,
+    default: 0,
+  },
 })
 
 const { getCategoryInfo, toggleTask, incrementCount } = useTaskManager()
@@ -31,7 +35,14 @@ const accentBtn = {
       class="flex-1 flex items-center gap-2 px-3 py-3 text-left min-w-0 active:bg-slate-600/80 transition"
       @click="toggleTask(task)"
     >
-      <span class="text-lg shrink-0">⬜</span>
+      <span
+        v-if="hotkeyIndex >= 1 && hotkeyIndex <= 9"
+        class="shrink-0 w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold font-mono bg-slate-900 border border-slate-500 text-slate-200"
+        :title="`Ctrl+${hotkeyIndex}`"
+      >
+        {{ hotkeyIndex }}
+      </span>
+      <span v-else class="text-lg shrink-0">⬜</span>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-slate-100 truncate">{{ task.title }}</div>
         <div class="flex items-center gap-1.5 mt-0.5">
@@ -55,6 +66,13 @@ const accentBtn = {
     </button>
 
     <div v-else class="flex-1 flex items-center gap-2 px-3 py-2.5 min-w-0">
+      <span
+        v-if="hotkeyIndex >= 1 && hotkeyIndex <= 9"
+        class="shrink-0 w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold font-mono bg-slate-900 border border-slate-500 text-slate-200"
+        :title="`Ctrl+${hotkeyIndex}`"
+      >
+        {{ hotkeyIndex }}
+      </span>
       <div class="flex-1 min-w-0">
         <div class="text-sm font-medium text-slate-100 truncate">{{ task.title }}</div>
         <div class="flex items-center gap-1.5 mt-0.5">
