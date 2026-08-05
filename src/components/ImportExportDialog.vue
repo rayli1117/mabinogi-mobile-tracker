@@ -2,13 +2,31 @@
 import { ref, watch } from 'vue'
 import { useTaskManager } from '../composables/useTaskManager'
 
-const { showImportExport, getExportText, importFromText } = useTaskManager()
+const {
+  showImportExport,
+  getExportText,
+  exportFullBackup,
+  importFromText,
+  importFullBackup,
+} = useTaskManager()
 
+const mode = ref('defs')
 const text = ref('')
 const textareaRef = ref(null)
 
+function refreshExportText() {
+  text.value = mode.value === 'full' ? exportFullBackup() : getExportText()
+}
+
 watch(showImportExport, (open) => {
-  if (open) text.value = getExportText()
+  if (open) {
+    mode.value = 'defs'
+    refreshExportText()
+  }
+})
+
+watch(mode, () => {
+  if (showImportExport.value) refreshExportText()
 })
 
 async function copyText() {
@@ -30,9 +48,9 @@ async function copyText() {
 }
 
 function handleImport() {
-  if (importFromText(text.value)) {
-    showImportExport.value = false
-  }
+  const ok =
+    mode.value === 'full' ? importFullBackup(text.value) : importFromText(text.value)
+  if (ok) showImportExport.value = false
 }
 
 function close() {
@@ -58,8 +76,38 @@ function close() {
           </button>
         </div>
 
-        <p class="text-xs text-slate-400">
+        <div class="flex gap-1 p-0.5 bg-slate-900/80 rounded-lg border border-slate-700">
+          <button
+            type="button"
+            class="flex-1 px-3 py-1.5 text-xs rounded-md transition font-medium"
+            :class="
+              mode === 'defs'
+                ? 'bg-amber-600/40 text-amber-100 border border-amber-500/50'
+                : 'text-slate-400 hover:text-slate-200 border border-transparent'
+            "
+            @click="mode = 'defs'"
+          >
+            任務清單
+          </button>
+          <button
+            type="button"
+            class="flex-1 px-3 py-1.5 text-xs rounded-md transition font-medium"
+            :class="
+              mode === 'full'
+                ? 'bg-amber-600/40 text-amber-100 border border-amber-500/50'
+                : 'text-slate-400 hover:text-slate-200 border border-transparent'
+            "
+            @click="mode = 'full'"
+          >
+            完整備份
+          </button>
+        </div>
+
+        <p v-if="mode === 'defs'" class="text-xs text-slate-400">
           複製下方文字即可備份任務清單；貼上後按「匯入」還原清單。不會匯出或覆蓋完成狀態與週期日期。
+        </p>
+        <p v-else class="text-xs text-slate-400">
+          完整備份包含角色、完成進度與週期日期。匯入會覆蓋目前全部資料。
         </p>
 
         <textarea

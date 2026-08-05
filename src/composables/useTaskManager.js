@@ -29,11 +29,47 @@ const presetAccountDailyTasks = [
 
 const presetCharacterWeeklyTasks = [
   { id: 'p_cw1', title: '會員兼職', done: false, category: 'parttime' },
-  { id: 'p_cw2', title: '一般兼職', done: false, category: 'parttime', currentCount: 0, maxCount: 6 },
-  { id: 'p_cw3', title: '魔物討伐證明', done: false, category: 'shop' },
-  { id: 'p_cw4', title: '野外首領', done: false, category: 'dungeon' },
-  { id: 'p_cw5', title: '深淵', done: false, category: 'dungeon', currentCount: 0, maxCount: 3 },
-  { id: 'p_cw6', title: '不祥的召喚結界', done: false, category: 'dungeon', currentCount: 0, maxCount: 7 },
+  {
+    id: 'p_cw2',
+    title: '一般兼職',
+    done: false,
+    category: 'parttime',
+    currentCount: 0,
+    maxCount: 6,
+    notes: '每週一更新 6 次',
+  },
+  {
+    id: 'p_cw3',
+    title: '魔物討伐證明',
+    done: false,
+    category: 'shop',
+    notes: '庫漢傭兵事務所NPC凱雅拉；堤爾克那村長家NPC鄧肯；杜巴頓官廳NPC伊文',
+  },
+  {
+    id: 'p_cw4',
+    title: '野外首領',
+    done: false,
+    category: 'dungeon',
+    notes: '每日12:00, 18:00, 20:00, 22:00登場',
+  },
+  {
+    id: 'p_cw5',
+    title: '深淵',
+    done: false,
+    category: 'dungeon',
+    currentCount: 0,
+    maxCount: 3,
+    notes: '65 級以上',
+  },
+  {
+    id: 'p_cw6',
+    title: '不祥的召喚結界',
+    done: false,
+    category: 'dungeon',
+    currentCount: 0,
+    maxCount: 7,
+    notes: '每日每 1 小時登場',
+  },
   {
     id: 'p_cw7',
     title: '黑色坑洞',
@@ -42,11 +78,21 @@ const presetCharacterWeeklyTasks = [
     currentCount: 0,
     maxCount: 14,
     rampingWeekly: { base: 7, perDay: 1 },
+    notes: '每週一更新 7 次，每日加 1 次；星期一更新後有 8 次（7 + 1）；每 30 分鐘登場；13分及43分登場',
   },
 ]
 
 const presetAccountWeeklyTasks = [
-  { id: 'p_aw1', title: '每週愛心幣聖水', done: false, category: 'shop', scope: 'account', currentCount: 0, maxCount: 20 },
+  {
+    id: 'p_aw1',
+    title: '每週愛心幣聖水',
+    done: false,
+    category: 'shop',
+    scope: 'account',
+    currentCount: 0,
+    maxCount: 20,
+    notes: '10愛心幣/1個；庫漢旅館NPC提爾',
+  },
   { id: 'p_aw2', title: '每週挑戰', done: false, category: 'other', scope: 'account' },
 ]
 
@@ -119,7 +165,9 @@ const storageApi = {
   ensureActiveCharacter: () => {},
   handleStorageChange: () => {},
   getExportText: () => '',
+  exportFullBackup: () => '',
   importFromText: () => false,
+  importFullBackup: () => false,
 }
 
 const tasks = createCharacterTasks(state, {
@@ -211,6 +259,7 @@ export function useTaskManager() {
     renameCurrentCharacter: tasks.renameCurrentCharacter,
     toggleTask: tasks.toggleTask,
     updateTask: tasks.updateTask,
+    setTaskNotes: tasks.setTaskNotes,
     incrementCount: tasks.incrementCount,
     decrementCount: tasks.decrementCount,
     addTask: tasks.addTask,
@@ -220,6 +269,8 @@ export function useTaskManager() {
     resetDaily: tasks.resetDaily,
     resetWeekly: tasks.resetWeekly,
     getExportText: storage.getExportText,
+    exportFullBackup: storage.exportFullBackup,
     importFromText: storage.importFromText,
+    importFullBackup: storage.importFullBackup,
   }
 }

@@ -281,6 +281,20 @@ function isValidImportPayload(parsed) {
   return !!(hasShared || hasAccount || hasLegacy)
 }
 
+function isValidFullBackupPayload(parsed) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
+  if (!normalizeCharacters(parsed.characters)) return false
+  const hasShared =
+    parsed.sharedCharacterTasks &&
+    typeof parsed.sharedCharacterTasks === 'object' &&
+    !Array.isArray(parsed.sharedCharacterTasks)
+  const hasLegacy =
+    parsed.characterTasks &&
+    typeof parsed.characterTasks === 'object' &&
+    !Array.isArray(parsed.characterTasks)
+  return !!(hasShared || hasLegacy)
+}
+
 /**
  * @param {object} state - shared Vue refs
  * @param {{
@@ -317,9 +331,9 @@ export function createTaskStorage(state, deps) {
     ensureCharProgress(activeCharId.value)
   }
 
-  function saveData() {
+  function buildFullSnapshot() {
     ensurePeriodCurrent()
-    const data = {
+    return {
       lastDate: lastDate.value,
       lastWeekKey: lastWeekKey.value,
       activeCharId: activeCharId.value,
@@ -328,6 +342,10 @@ export function createTaskStorage(state, deps) {
       characterProgress: characterProgress.value,
       accountTasks: accountTasks.value,
     }
+  }
+
+  function saveData() {
+    const data = buildFullSnapshot()
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
       return true
@@ -446,6 +464,10 @@ export function createTaskStorage(state, deps) {
     return JSON.stringify(data, null, 2)
   }
 
+  function exportFullBackup() {
+    return JSON.stringify(buildFullSnapshot(), null, 2)
+  }
+
   function importFromText(raw) {
     try {
       const parsed = JSON.parse(raw)
@@ -490,6 +512,66 @@ export function createTaskStorage(state, deps) {
     }
   }
 
+  function importFullBackup(raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (!isValidFullBackupPayload(parsed)) {
+        alert('⚠️ 文字格式不符合完整備份規格！需包含角色與任務清單。')
+        return false
+      }
+
+      if (
+        !confirm(
+          '完整匯入會覆蓋角色、完成狀態、週期日期與任務清單，確定要繼續嗎？',
+        )
+      ) {
+        return false
+      }
+
+      const todayKey = getCustomDateString()
+      const currentWeekKey = getCustomWeekKey()
+      const normalizedChars = normalizeCharacters(parsed.characters)
+
+      characters.value = normalizedChars
+      activeCharId.value = resolveActiveCharId(normalizedChars, parsed.activeCharId)
+      const resolved = resolveSharedAndProgress(
+        normalizedChars,
+        activeCharId.value,
+        parsed,
+        presets,
+      )
+      sharedCharacterTasks.value = resolved.shared
+      characterProgress.value = resolved.progress
+      accountTasks.value = normalizeAccountTasks(parsed.accountTasks)
+      ensureActiveCharacter()
+
+      const importedLastDate =
+        typeof parsed.lastDate === 'string' ? parsed.lastDate : todayKey
+      const importedLastWeekKey =
+        typeof parsed.lastWeekKey === 'string' ? parsed.lastWeekKey : currentWeekKey
+      const needResetDaily = importedLastDate !== todayKey
+      const needResetWeekly = importedLastWeekKey !== currentWeekKey
+      applyPeriodResets(needResetDaily, needResetWeekly)
+
+      lastDate.value = todayKey
+      lastWeekKey.value = currentWeekKey
+      saveData()
+
+      let msg = '🎉 完整備份匯入成功！'
+      if (needResetDaily || needResetWeekly) {
+        const parts = []
+        if (needResetDaily) parts.push('每日')
+        if (needResetWeekly) parts.push('每週')
+        msg += `（已依目前週期重設：${parts.join('、')}）`
+      }
+      alert(msg)
+      return true
+    } catch {
+      alert('❌ 解析 JSON 文字失敗，請確認格式是否正確。')
+      return false
+    }
+  }
+
   return {
     STORAGE_KEY,
     saveData,
@@ -497,6 +579,8 @@ export function createTaskStorage(state, deps) {
     ensureActiveCharacter,
     handleStorageChange,
     getExportText,
+    exportFullBackup,
     importFromText,
+    importFullBackup,
   }
 }

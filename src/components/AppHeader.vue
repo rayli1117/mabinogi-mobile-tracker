@@ -1,7 +1,10 @@
 <script setup>
+import { useRouter } from 'vue-router'
 import { useTaskManager } from '../composables/useTaskManager'
 import CharacterBar from './CharacterBar.vue'
 import CountdownTimer from './CountdownTimer.vue'
+
+const router = useRouter()
 
 const {
   lastDate,
@@ -13,6 +16,11 @@ const {
   resetDaily,
   resetWeekly,
 } = useTaskManager()
+
+function openOverlayWindow() {
+  const url = router.resolve({ name: 'overlay' }).href
+  window.open(url, 'mmt-overlay', 'width=360,height=640,resizable=yes,scrollbars=yes')
+}
 </script>
 
 <template>
@@ -51,6 +59,14 @@ const {
           </button>
         </div>
         <div class="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            @click="openOverlayWindow"
+            class="px-2.5 py-1.5 bg-emerald-600/40 hover:bg-emerald-600/60 text-emerald-200 text-xs rounded border border-emerald-500/50 transition font-semibold"
+            title="開啟精簡浮動清單視窗"
+          >
+            🪟 Overlay
+          </button>
           <button
             @click="showDashboard = true"
             class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded shadow transition flex items-center gap-1"

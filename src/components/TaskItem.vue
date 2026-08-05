@@ -19,6 +19,7 @@ const {
   getCategoryInfo,
   toggleTask,
   updateTask,
+  setTaskNotes,
   incrementCount,
   decrementCount,
   deleteTask,
@@ -28,9 +29,14 @@ const isEditingTitle = ref(false)
 const editTitle = ref('')
 const titleInput = ref(null)
 
+const isEditingNotes = ref(false)
+const editNotes = ref('')
+const notesInput = ref(null)
+
 watch(editMode, (on) => {
   if (!on) {
     isEditingTitle.value = false
+    isEditingNotes.value = false
   }
 })
 
@@ -38,6 +44,7 @@ async function startEditTitle() {
   if (!editMode.value) return
   editTitle.value = props.task.title
   isEditingTitle.value = true
+  isEditingNotes.value = false
   await nextTick()
   titleInput.value?.focus()
   titleInput.value?.select()
@@ -54,6 +61,27 @@ function cancelEditTitle() {
   editTitle.value = props.task.title
 }
 
+async function startEditNotes() {
+  if (!editMode.value) return
+  editNotes.value = props.task.notes || ''
+  isEditingNotes.value = true
+  isEditingTitle.value = false
+  await nextTick()
+  notesInput.value?.focus()
+  notesInput.value?.select()
+}
+
+function saveNotes() {
+  if (!isEditingNotes.value) return
+  setTaskNotes(props.task.id, editNotes.value)
+  isEditingNotes.value = false
+}
+
+function cancelEditNotes() {
+  isEditingNotes.value = false
+  editNotes.value = props.task.notes || ''
+}
+
 function onRowClick() {
   if (editMode.value) return
   toggleTask(props.task)
@@ -68,6 +96,7 @@ function onRowClick() {
         ? 'bg-slate-900/50 border-slate-800/80 text-slate-500'
         : 'bg-slate-700/50 border-slate-600 hover:border-slate-500'
     "
+    :title="task.notes || undefined"
   >
     <div
       class="flex-1 flex items-center gap-3 overflow-hidden"
@@ -76,26 +105,56 @@ function onRowClick() {
     >
       <span class="text-lg transition-transform active:scale-125 shrink-0">{{ task.done ? '✅' : '⬜' }}</span>
 
-      <input
-        v-if="isEditingTitle"
-        ref="titleInput"
-        v-model="editTitle"
-        type="text"
-        class="flex-1 min-w-0 bg-slate-900 border border-amber-500/60 rounded px-2 py-0.5 text-sm text-slate-100 focus:outline-none"
-        @click.stop
-        @keydown.enter.prevent="saveTitle"
-        @keydown.escape.prevent="cancelEditTitle"
-        @blur="saveTitle"
-      />
-      <span
-        v-else
-        class="truncate"
-        :class="{ 'line-through': task.done, 'cursor-text': editMode }"
-        :title="editMode ? '點擊重新命名' : undefined"
-        @click.stop="editMode ? startEditTitle() : onRowClick()"
-      >
-        {{ task.title }}
-      </span>
+      <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+        <input
+          v-if="isEditingTitle"
+          ref="titleInput"
+          v-model="editTitle"
+          type="text"
+          class="w-full min-w-0 bg-slate-900 border border-amber-500/60 rounded px-2 py-0.5 text-sm text-slate-100 focus:outline-none"
+          @click.stop
+          @keydown.enter.prevent="saveTitle"
+          @keydown.escape.prevent="cancelEditTitle"
+          @blur="saveTitle"
+        />
+        <span
+          v-else
+          class="truncate"
+          :class="{ 'line-through': task.done, 'cursor-text': editMode }"
+          :title="editMode ? '點擊重新命名' : task.notes || undefined"
+          @click.stop="editMode ? startEditTitle() : onRowClick()"
+        >
+          {{ task.title }}
+        </span>
+
+        <input
+          v-if="isEditingNotes"
+          ref="notesInput"
+          v-model="editNotes"
+          type="text"
+          class="w-full min-w-0 bg-slate-900 border border-amber-500/40 rounded px-2 py-0.5 text-xs text-slate-300 focus:outline-none"
+          placeholder="NPC / 地點備註…"
+          @click.stop
+          @keydown.enter.prevent="saveNotes"
+          @keydown.escape.prevent="cancelEditNotes"
+          @blur="saveNotes"
+        />
+        <span
+          v-else-if="task.notes || editMode"
+          class="truncate text-[11px] leading-tight"
+          :class="
+            task.notes
+              ? task.done
+                ? 'text-slate-600'
+                : 'text-slate-400'
+              : 'text-slate-600 italic'
+          "
+          :title="editMode ? '點擊編輯備註' : task.notes || undefined"
+          @click.stop="editMode ? startEditNotes() : onRowClick()"
+        >
+          {{ task.notes || (editMode ? '新增備註…' : '') }}
+        </span>
+      </div>
 
       <span
         v-if="task.scope === 'account'"
@@ -152,6 +211,14 @@ function onRowClick() {
           title="重新命名任務"
         >
           ✎
+        </button>
+
+        <button
+          @click.stop="startEditNotes"
+          class="p-1 text-xs rounded transition text-slate-500 hover:text-slate-200 opacity-80 sm:opacity-0 sm:group-hover:opacity-100"
+          title="編輯備註"
+        >
+          📝
         </button>
 
         <button

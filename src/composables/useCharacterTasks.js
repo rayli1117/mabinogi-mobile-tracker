@@ -26,6 +26,9 @@ export function toTaskDef(task) {
   if (task.maxCount) def.maxCount = task.maxCount
   const ramp = resolveRampingWeekly(task)
   if (ramp) def.rampingWeekly = ramp
+  if (typeof task.notes === 'string' && task.notes.trim()) {
+    def.notes = task.notes.trim()
+  }
   return def
 }
 
@@ -213,6 +216,7 @@ export function createCharacterTasks(state, deps) {
         merged.rampingWeekly = ramp
         merged.weeklyMaxCount = def.maxCount
       }
+      if (def.notes) merged.notes = def.notes
       return merged
     })
   }
@@ -457,6 +461,33 @@ export function createCharacterTasks(state, deps) {
     }
 
     saveData()
+  }
+
+  function findAccountTask(taskId) {
+    const daily = (accountTasks.value.dailyTasks || []).find((t) => t.id === taskId)
+    if (daily) return daily
+    return (accountTasks.value.weeklyTasks || []).find((t) => t.id === taskId) || null
+  }
+
+  function setTaskNotes(taskId, notes) {
+    if (typeof taskId !== 'string' || !taskId) return false
+
+    const trimmed = typeof notes === 'string' ? notes.trim() : ''
+    const accountTask = findAccountTask(taskId)
+    if (accountTask) {
+      if (trimmed) accountTask.notes = trimmed
+      else delete accountTask.notes
+      saveData()
+      return true
+    }
+
+    const found = findSharedTaskDef(taskId)
+    if (!found?.def) return false
+
+    if (trimmed) found.def.notes = trimmed
+    else delete found.def.notes
+    saveData()
+    return true
   }
 
   function incrementCount(task) {
@@ -731,6 +762,7 @@ export function createCharacterTasks(state, deps) {
     renameCurrentCharacter,
     toggleTask,
     updateTask,
+    setTaskNotes,
     incrementCount,
     decrementCount,
     addTask,
